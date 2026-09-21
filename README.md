@@ -6,11 +6,13 @@ Combat keys never send `autogear` or `leave`. Those live on the Gear page.
 
 ## Install
 
-Copy this folder to:
+Unzip the GitHub download. Copy the inner **BotCtrl** folder (the one that contains `BotCtrl.toc`) into:
 
 ```
 Interface/AddOns/BotCtrl
 ```
+
+Do not copy the outer folder that also has this README — WoW only loads a folder that has `BotCtrl.toc` at its top level.
 
 Enable **BotCtrl** at character select. `/reload` after updates.
 
