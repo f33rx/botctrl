@@ -1,0 +1,50 @@
+<Bindings>
+	<Binding name="BOTCTRL_FOLLOW" header="BOTCTRL">
+		BotCtrl_Bind("FOLLOW")
+	</Binding>
+	<Binding name="BOTCTRL_STAY">
+		BotCtrl_Bind("STAY")
+	</Binding>
+	<Binding name="BOTCTRL_SUMMON">
+		BotCtrl_Bind("SUMMON")
+	</Binding>
+	<Binding name="BOTCTRL_DRINK">
+		BotCtrl_Bind("DRINK")
+	</Binding>
+	<Binding name="BOTCTRL_FLEE">
+		BotCtrl_Bind("FLEE")
+	</Binding>
+	<Binding name="BOTCTRL_TANKHOLD">
+		BotCtrl_Bind("TANKHOLD")
+	</Binding>
+	<Binding name="BOTCTRL_TANKPULL">
+		BotCtrl_Bind("TANKPULL")
+	</Binding>
+	<Binding name="BOTCTRL_TANKGO">
+		BotCtrl_Bind("TANKGO")
+	</Binding>
+	<Binding name="BOTCTRL_ATTACK">
+		BotCtrl_Bind("ATTACK")
+	</Binding>
+	<Binding name="BOTCTRL_BURN">
+		BotCtrl_Bind("BURN")
+	</Binding>
+	<Binding name="BOTCTRL_SKULL">
+		BotCtrl_Bind("SKULL")
+	</Binding>
+	<Binding name="BOTCTRL_WATER">
+		BotCtrl_Bind("WATER")
+	</Binding>
+	<Binding name="BOTCTRL_LOOP">
+		BotCtrl_Bind("LOOP")
+	</Binding>
+	<Binding name="BOTCTRL_SETUP">
+		BotCtrl_Bind("SETUP")
+	</Binding>
+	<Binding name="BOTCTRL_MARK">
+		BotCtrl_Bind("MARK")
+	</Binding>
+	<Binding name="BOTCTRL_CLEAR">
+		BotCtrl_Bind("CLEAR")
+	</Binding>
+</Bindings>

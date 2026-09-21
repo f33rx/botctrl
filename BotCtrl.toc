@@ -1,0 +1,8 @@
+## Interface: 30300
+## Title: |cffffd100BotCtrl|r
+## Notes: Party bot commander. Resolves tank/DPS by roster, not hardcoded names.
+## Author: f33rx
+## Version: 1.5.0
+## SavedVariables: BotCtrlDB
+
+BotCtrl.lua
