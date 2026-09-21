@@ -4,6 +4,8 @@ Playerbot commander for **World of Warcraft 3.3.5a** (Interface 30300). Clickabl
 
 Combat keys never send `autogear` or `leave`. Those live on the Gear page.
 
+![BotCtrl Fight and Gear pages, annotated](preview.svg)
+
 ## Install
 
 Unzip the GitHub download. Copy the inner **BotCtrl** folder (the one that contains `BotCtrl.toc`) into:
