@@ -32,7 +32,7 @@ Auto-tank uses real signals, not class: Righteous Fury, Defensive Stance, Frost 
 
 ### Pack marks (old PackMark)
 
-**Mark** ON, nameplates (V), mouse over the pack. Casters/healers get skull. **Skull** (Ctrl-3) then does `rti skull` + `attack` and will not steal that skull onto your target. **Clear** wipes markers. Disable the standalone PackMark addon so the two do not fight.
+**Mark** ON, nameplates (V), mouse over the pack. Casters/healers get skull. Icons only — bots do not attack until **Pull**, **Go**, or **Kill** / **Skull**. **Clear** wipes markers. Disable the standalone PackMark addon so the two do not fight.
 
 ## Gear page
 
@@ -52,4 +52,3 @@ Train / Sell / Home only light up with a trainer, vendor, or innkeeper targeted.
 /bot binds | unbind
 ```
 
-Default AH to post, not Auctioneer.

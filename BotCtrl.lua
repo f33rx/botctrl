@@ -589,6 +589,15 @@ local function RankPack()
 	return list
 end
 
+-- Painting skull must not start a fight. Leftover "rti skull" from the last
+-- Kill would send bots into the new caster as soon as Mark assigns skull.
+local function ClearRti()
+	if InGroup() then
+		Enqueue("rti none", ChatChan(), nil)
+		lastCmd = "/p rti none"
+	end
+end
+
 local function ApplyVisible()
 	if not db or not db.markEnabled then return end
 	if not CanMark() then
@@ -619,6 +628,7 @@ local function ApplyVisible()
 
 	if visCount > 0 and not overlap and next(pack) then
 		wipe(pack)
+		ClearRti()
 	end
 
 	for guid, unit in pairs(visGuids) do
@@ -859,7 +869,8 @@ local function CmdMarkToggle()
 	db.markEnabled = not db.markEnabled
 	announcedGroup = false
 	if db.markEnabled then
-		Print("Mark ON - hover nameplates (V). Casters get skull. Skull/rti will not steal it.")
+		ClearRti()
+		Print("Mark ON - hover nameplates (V). Icons only, no attack. Pull / Go / Kill to fight.")
 		ApplyVisible()
 	else
 		Print("Mark OFF")
@@ -872,6 +883,7 @@ end
 
 local function CmdMarkClear()
 	ClearMarks()
+	ClearRti()
 	Print("Marks cleared.")
 	return true
 end
@@ -1653,10 +1665,10 @@ local function BuildUI()
 		  title = "Shift-3  Tank go",
 		  lines = { "Party: tank attack" } },
 		{ label = "Mark", key = "", cmd = "MARK", click = CmdMarkToggle, mod = "mark", color = UTIL_COLOR,
-		  title = "Pack mark",
+		  title = "Pack mark (no combat)",
 		  lines = {
 			"Hover nameplates (V): casters/healers get skull.",
-			"Then Ctrl-3 Skull is rti + attack, without stealing the skull.",
+			"Icons only. Bots will not attack until Pull, Go, or Kill.",
 			"Not a Shift key. Click only.",
 		  } },
 		{ label = "Clear", key = "", cmd = "CLEAR", click = CmdMarkClear, mod = "mark", color = UTIL_COLOR,
@@ -1673,7 +1685,7 @@ local function BuildUI()
 		  lines = { "Party: max dps" } },
 		{ label = "Skull", key = "C3", cmd = "SKULL", click = CmdSkull,
 		  title = "Ctrl-3  Kill order",
-		  lines = { "Skull your target, /p rti skull, /p attack." } },
+		  lines = { "rti skull + attack. This is the go-ahead to fight the mark." } },
 		{ label = "Water", key = "C4", cmd = "WATER", click = CmdWater,
 		  title = "Ctrl-4  Mage water",
 		  lines = { "Whispers every mage: cast conjure water." } },
@@ -1994,7 +2006,7 @@ SlashCmdList["BOTCTRL"] = function(msg)
 		Print("/bot autogear maint repair talents train sell food home stats loot resetai leave")
 		Print("/bot tank Name  |  /bot dps Name  |  /bot heal Name")
 		Print("/bot binds  /bot unbind  /bot show  /bot hide  /bot lock  /bot reset")
-		Print("Combat keys never send autogear or leave. Default AH to post, not Auctioneer.")
+		Print("Combat keys never send autogear or leave.")
 	elseif COMMANDS[cmd:upper()] then
 		COMMANDS[cmd:upper()]()
 	elseif cmd == "hold" then
