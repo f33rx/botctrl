@@ -34,9 +34,9 @@ Auto-tank uses real signals, not class: Righteous Fury, Defensive Stance, Frost 
 
 **Setup** (once after invite) whispers `co +tank` / `nc +follow` to the tank and `co +dps` to the rest.
 
-### Pack marks (old PackMark)
+### Pack marks
 
-**Mark** ON, nameplates (V), mouse over the pack. Casters/healers get skull. Icons only — bots do not attack until **Pull**, **Go**, or **Kill** / **Skull**. **Clear** wipes markers. Disable the standalone PackMark addon so the two do not fight.
+**Mark** ON, nameplates (V), mouse over the pack. Casters/healers get skull. Icons only — bots do not attack until **Pull**, **Go**, or **Kill** / **Skull**. **Clear** wipes markers.
 
 ## Gear page
 

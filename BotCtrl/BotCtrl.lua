@@ -563,11 +563,11 @@ local function Remember(unit)
 	end
 end
 
-local function RankPack()
+local function PackList()
 	local now = GetTime()
 	local list = {}
 	for guid, rec in pairs(pack) do
-		if (now - rec.seen) > 8 then
+		if (now - rec.seen) > 20 then
 			pack[guid] = nil
 		else
 			list[#list + 1] = rec
@@ -577,13 +577,70 @@ local function RankPack()
 		if a.score ~= b.score then
 			return a.score > b.score
 		end
+		if a.mark and b.mark then
+			return a.mark > b.mark
+		end
 		return a.seen < b.seen
 	end)
+	return list
+end
+
+local function NextFreeMark(used)
+	for i = 1, #MARK_ORDER do
+		local m = MARK_ORDER[i]
+		if not used[m] then
+			return m
+		end
+	end
+	return nil
+end
+
+-- Assign once. Do not reshuffle every sweep — that is what spammed
+-- "sets skull / X" between Earthborer and the elemental.
+-- Skull may move onto a caster/healer that scores clearly higher.
+local function RankPack()
+	local list = PackList()
+	local used = {}
+	local skullHolder
 	for i = 1, #list do
-		if (not db or db.markMelee) or list[i].score >= 65 then
-			list[i].mark = MARK_ORDER[i]
-		else
-			list[i].mark = nil
+		local rec = list[i]
+		if rec.mark then
+			used[rec.mark] = rec
+			if rec.mark == 8 then
+				skullHolder = rec
+			end
+		end
+	end
+
+	local best = list[1]
+	if best and best.score >= 80 and (not skullHolder or (skullHolder.guid ~= best.guid and skullHolder.score + 15 < best.score)) then
+		if skullHolder then
+			local old = best.mark
+			skullHolder.mark = old
+			if old then
+				used[old] = skullHolder
+			end
+		end
+		best.mark = 8
+		used[8] = best
+		used = {}
+		for i = 1, #list do
+			if list[i].mark then
+				used[list[i].mark] = list[i]
+			end
+		end
+	end
+
+	for i = 1, #list do
+		local rec = list[i]
+		if not rec.mark then
+			if (not db or db.markMelee) or rec.score >= 65 then
+				local m = NextFreeMark(used)
+				if m then
+					rec.mark = m
+					used[m] = rec
+				end
+			end
 		end
 	end
 	return list
@@ -626,23 +683,22 @@ local function ApplyVisible()
 		end
 	end
 
-	if visCount > 0 and not overlap and next(pack) then
+	-- Need a real new pack (2+ unseen mobs). One tank-target swap must not
+	-- wipe Earthborer + elemental and reshuffle icons.
+	if visCount >= 2 and not overlap and next(pack) then
 		wipe(pack)
 		ClearRti()
 	end
 
-	for guid, unit in pairs(visGuids) do
-		Remember(unit)
-	end
-
-	local ranked = RankPack()
-	local byGuid = {}
-	for i = 1, #ranked do
-		byGuid[ranked[i].guid] = ranked[i]
+	if not UnitAffectingCombat("player") then
+		for guid, unit in pairs(visGuids) do
+			Remember(unit)
+		end
+		RankPack()
 	end
 
 	for guid, unit in pairs(visGuids) do
-		local rec = byGuid[guid]
+		local rec = pack[guid]
 		local want = rec and rec.mark
 		local have = GetRaidTargetIndex(unit) or 0
 		if want and have ~= want then
@@ -709,7 +765,7 @@ local function MarkStatusText()
 	if not db or not db.markEnabled then
 		return nil
 	end
-	local ranked = RankPack()
+	local ranked = PackList()
 	local parts = {}
 	local n = #ranked
 	if n > 3 then n = 3 end
