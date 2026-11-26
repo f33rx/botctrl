@@ -1,8 +1,8 @@
--- BotCtrl 1.5.0 — WotLK 3.3.5a (Interface 30300)
+-- BotCtrl 1.6.0 — WotLK 3.3.5a (Interface 30300)
 -- Playerbot commander. Names come from the party roster; roles are assigned
--- here, not hardcoded in macros. Combat keys never send autogear or leave.
--- Gear / maintenance lives on a second page, toggled from the header.
--- Pack marking (old PackMark) lives on the Fight page: Mark + Clear.
+-- here, not hardcoded in macros. Combat keys never send autogear, leave,
+-- or Strat / Orders / Quest chat. Tabs: Fight, Gear, Strat, Orders, Quest.
+-- Pack marking (old PackMark) lives on the Fight tab: Mark + Clear.
 
 local ADDON = "BotCtrl"
 
@@ -96,6 +96,11 @@ local ui
 local setupDone = false
 local loopIndex = 1
 local lastCmd = ""
+-- Tank follow makes him peel back to the healer mid-cast. Stay once he
+-- is planted on the pack; follow again after the group drops combat.
+local tankAnchor = "follow"
+local anchorQuiet = 0
+local tankEngaged = 0
 local bindsPending = false
 local queue = {}
 local qElapsed = 0
@@ -357,6 +362,70 @@ local function TankName()
 	return r and r.name or nil
 end
 
+local function GroupStillFighting()
+	if UnitAffectingCombat("player") then
+		return true
+	end
+	local fighting = false
+	EachMember(function(unit)
+		if UnitAffectingCombat(unit) then
+			fighting = true
+		end
+	end)
+	return fighting
+end
+
+-- Whisper the tank only. DPS keep their own orders.
+local function TickTankAnchor(dt)
+	if not InGroup() then
+		return
+	end
+	local rec = rosterCache.tank
+	if not rec or not rec.name or not rec.unit or not UnitExists(rec.unit) then
+		return
+	end
+	if UnitName(rec.unit) ~= rec.name then
+		return
+	end
+	local u = rec.unit
+	local tgt = u .. "target"
+	local onMob = UnitAffectingCombat(u)
+		and UnitExists(tgt)
+		and not UnitIsDeadOrGhost(tgt)
+		and UnitCanAttack(u, tgt)
+	if onMob then
+		anchorQuiet = 0
+		if GetUnitSpeed(u) == 0 then
+			tankEngaged = tankEngaged + dt
+		else
+			tankEngaged = 0
+		end
+		-- Planted, or the mob has already turned on him. Do not stay
+		-- during the charge or he freezes short of the pack.
+		local arrived = tankEngaged >= 0.4 or (UnitExists(tgt .. "target") and UnitIsUnit(tgt .. "target", u))
+		if arrived and tankAnchor ~= "stay" then
+			Whisper(rec.name, "stay")
+			tankAnchor = "stay"
+			Print(rec.name .. ": stay (on the pack)")
+		end
+		return
+	end
+	tankEngaged = 0
+	if GroupStillFighting() then
+		anchorQuiet = 0
+		return
+	end
+	if tankAnchor ~= "follow" then
+		anchorQuiet = anchorQuiet + dt
+		if anchorQuiet >= 1.5 then
+			Whisper(rec.name, "follow")
+			tankAnchor = "follow"
+			anchorQuiet = 0
+			Print(rec.name .. ": follow")
+		end
+	end
+end
+
 local function SetRole(name, role)
 	if not db or not name then return end
 	if role == "tank" then
@@ -563,11 +632,11 @@ local function Remember(unit)
 	end
 end
 
-local function RankPack()
+local function PackList()
 	local now = GetTime()
 	local list = {}
 	for guid, rec in pairs(pack) do
-		if (now - rec.seen) > 8 then
+		if (now - rec.seen) > 20 then
 			pack[guid] = nil
 		else
 			list[#list + 1] = rec
@@ -577,13 +646,70 @@ local function RankPack()
 		if a.score ~= b.score then
 			return a.score > b.score
 		end
+		if a.mark and b.mark then
+			return a.mark > b.mark
+		end
 		return a.seen < b.seen
 	end)
+	return list
+end
+
+local function NextFreeMark(used)
+	for i = 1, #MARK_ORDER do
+		local m = MARK_ORDER[i]
+		if not used[m] then
+			return m
+		end
+	end
+	return nil
+end
+
+-- Assign once. Do not reshuffle every sweep — that is what spammed
+-- "sets skull / X" between Earthborer and the elemental.
+-- Skull may move onto a caster/healer that scores clearly higher.
+local function RankPack()
+	local list = PackList()
+	local used = {}
+	local skullHolder
 	for i = 1, #list do
-		if (not db or db.markMelee) or list[i].score >= 65 then
-			list[i].mark = MARK_ORDER[i]
-		else
-			list[i].mark = nil
+		local rec = list[i]
+		if rec.mark then
+			used[rec.mark] = rec
+			if rec.mark == 8 then
+				skullHolder = rec
+			end
+		end
+	end
+
+	local best = list[1]
+	if best and best.score >= 80 and (not skullHolder or (skullHolder.guid ~= best.guid and skullHolder.score + 15 < best.score)) then
+		if skullHolder then
+			local old = best.mark
+			skullHolder.mark = old
+			if old then
+				used[old] = skullHolder
+			end
+		end
+		best.mark = 8
+		used[8] = best
+		used = {}
+		for i = 1, #list do
+			if list[i].mark then
+				used[list[i].mark] = list[i]
+			end
+		end
+	end
+
+	for i = 1, #list do
+		local rec = list[i]
+		if not rec.mark then
+			if (not db or db.markMelee) or rec.score >= 65 then
+				local m = NextFreeMark(used)
+				if m then
+					rec.mark = m
+					used[m] = rec
+				end
+			end
 		end
 	end
 	return list
@@ -626,23 +752,22 @@ local function ApplyVisible()
 		end
 	end
 
-	if visCount > 0 and not overlap and next(pack) then
+	-- Need a real new pack (2+ unseen mobs). One tank-target swap must not
+	-- wipe Earthborer + elemental and reshuffle icons.
+	if visCount >= 2 and not overlap and next(pack) then
 		wipe(pack)
 		ClearRti()
 	end
 
-	for guid, unit in pairs(visGuids) do
-		Remember(unit)
-	end
-
-	local ranked = RankPack()
-	local byGuid = {}
-	for i = 1, #ranked do
-		byGuid[ranked[i].guid] = ranked[i]
+	if not UnitAffectingCombat("player") then
+		for guid, unit in pairs(visGuids) do
+			Remember(unit)
+		end
+		RankPack()
 	end
 
 	for guid, unit in pairs(visGuids) do
-		local rec = byGuid[guid]
+		local rec = pack[guid]
 		local want = rec and rec.mark
 		local have = GetRaidTargetIndex(unit) or 0
 		if want and have ~= want then
@@ -705,23 +830,43 @@ local function HasPackSkull()
 	return false
 end
 
+-- "Twilight Cultist" / "Molten Elemental" -> Cultist / Elemental, not "Twilight".
+local function MobShort(name)
+	if not name or name == "" then
+		return "?"
+	end
+	local last = name:match("(%S+)$")
+	if last and #last >= 3 then
+		name = last
+	end
+	if #name > 10 then
+		return name:sub(1, 10)
+	end
+	return name
+end
+
 local function MarkStatusText()
 	if not db or not db.markEnabled then
 		return nil
 	end
-	local ranked = RankPack()
+	local ranked = PackList()
+	table.sort(ranked, function(a, b)
+		local ma = a.mark or 0
+		local mb = b.mark or 0
+		if ma ~= mb then
+			return ma > mb
+		end
+		return a.score > b.score
+	end)
 	local parts = {}
-	local n = #ranked
-	if n > 3 then n = 3 end
-	for i = 1, n do
+	local n = 0
+	for i = 1, #ranked do
 		local rec = ranked[i]
 		if rec.mark then
+			n = n + 1
+			if n > 4 then break end
 			local iconTex = "|T" .. RaidIconPath(rec.mark) .. ":12:12|t"
-			local short = rec.name or "?"
-			if #short > 8 then
-				short = short:sub(1, 8)
-			end
-			parts[#parts + 1] = iconTex .. "|cffffdd66" .. short .. "|r"
+			parts[#parts + 1] = iconTex .. "|cffffdd66" .. MobShort(rec.name) .. "|r"
 		end
 	end
 	if #parts == 0 then
@@ -1003,9 +1148,52 @@ local function CmdLeave()
 	return
 end
 
-local function TogglePage()
-	if not ui or not ui.SetPage then return end
-	ui:SetPage((ui.page == "gear") and "combat" or "gear")
+local function CmdParty(msg)
+	return CmdPrep(msg, msg)
+end
+
+local function HasNpcTarget()
+	return UnitExists("target") and not UnitIsPlayer("target")
+end
+
+local function CmdQuestAccept()
+	if not HasNpcTarget() then
+		Print("A quest giver is required.")
+		return
+	end
+	return CmdParty("accept *")
+end
+
+local function CmdQuestTalk()
+	if not HasNpcTarget() then
+		Print("A quest giver is required.")
+		return
+	end
+	return CmdParty("talk")
+end
+
+-- Stuck-cast order. Not reset botAI, and not /bot reset (that moves the bar).
+local function CmdStuckReset()
+	return CmdParty("reset")
+end
+
+local function CmdVendorOrder()
+	if not HasNpcTarget() then
+		Print("Target a vendor first.")
+		return
+	end
+	return CmdParty("s vendor")
+end
+
+local function ClickChip(label, msg, cmd, lines, click)
+	return {
+		label = label,
+		key = "",
+		cmd = cmd,
+		click = click or function() CmdParty(msg) end,
+		title = msg,
+		lines = lines or { "Party chat. Click only." },
+	}
 end
 
 local function WipeOrInstanceReset()
@@ -1206,7 +1394,7 @@ local function CurrentMod()
 end
 
 local function ChipAvailable(b)
-	if not b or b.mod == "util" or b.mod == "mark" then
+	if not b or b.mod == "util" or b.mod == "mark" or b.mod == "tab" then
 		return true
 	end
 	if not InGroup() then
@@ -1227,7 +1415,7 @@ local function ChipAvailable(b)
 		if HasPackSkull() then return true end
 		return UnitExists("target") and not UnitIsFriend("player", "target")
 	end
-	if cmd == "TRAIN" or cmd == "SELL" or cmd == "HOME" then
+	if cmd == "TRAIN" or cmd == "SELL" or cmd == "HOME" or cmd == "SVENDOR" or cmd == "QACCEPT" or cmd == "QTALK" then
 		return UnitExists("target") and not UnitIsPlayer("target")
 	end
 	return true
@@ -1235,14 +1423,16 @@ end
 
 local function ChipActiveForMod(b, mod)
 	if not b then return false end
-	if b.mod == "util" then return false end
+	if b.mod == "util" or b.mod == "tab" or b.mod == "click" then
+		return false
+	end
 	if b.mod == "gear" then
 		return ui and ui.page == "gear"
 	end
 	if b.mod == "mark" then
-		return ui and ui.page ~= "gear"
+		return ui and ui.page == "combat"
 	end
-	if ui and ui.page == "gear" then
+	if ui and ui.page ~= "combat" then
 		return false
 	end
 	if b.mod == "party" then return mod == "none" end
@@ -1264,10 +1454,22 @@ local function PaintChip(b)
 		return
 	end
 
-	if b.mod == "util" then
+	if b.mod == "util" or b.mod == "tab" then
 		PaintFromColor(b, false)
 		if b.readyGlow then b.readyGlow:SetAlpha(0) end
 		if b.labelFs then b.labelFs:SetTextColor(0.92, 0.92, 0.92) end
+		return
+	end
+	if b.mod == "click" then
+		PaintFromColor(b, not avail)
+		if b.readyGlow then b.readyGlow:SetAlpha(0) end
+		if b.labelFs then
+			if avail then
+				b.labelFs:SetTextColor(0.92, 0.92, 0.92)
+			else
+				b.labelFs:SetTextColor(0.45, 0.45, 0.45)
+			end
+		end
 		return
 	end
 
@@ -1296,10 +1498,11 @@ local function ApplyModifierLook()
 	lastModKey = mod
 	if ui.rowGlows then
 		local g = ui.rowGlows
+		local onCombat = ui.page == "combat"
 		local onGear = ui.page == "gear"
-		if g.party then g.party:SetAlpha((not onGear and mod == "none") and 0.42 or 0) end
-		if g.tank then g.tank:SetAlpha((not onGear and mod == "shift") and 0.50 or 0) end
-		if g.dps then g.dps:SetAlpha((not onGear and mod == "ctrl") and 0.50 or 0) end
+		if g.party then g.party:SetAlpha((onCombat and mod == "none") and 0.42 or 0) end
+		if g.tank then g.tank:SetAlpha((onCombat and mod == "shift") and 0.50 or 0) end
+		if g.dps then g.dps:SetAlpha((onCombat and mod == "ctrl") and 0.50 or 0) end
 		local gearA = onGear and 0.38 or 0
 		if g.gear1 then g.gear1:SetAlpha(gearA) end
 		if g.gear2 then g.gear2:SetAlpha(gearA) end
@@ -1427,13 +1630,19 @@ local function MakeChip(parent, label, keyText, width, click, title, lines, colo
 				GameTooltip:AddLine(lines[i], 1, 1, 1, true)
 			end
 		end
-		local mod = CurrentMod()
-		if ChipActiveForMod(self, mod) and ChipAvailable(self) then
-			GameTooltip:AddLine("Live for this modifier", 0.4, 1, 0.4)
-		elseif not ChipAvailable(self) then
-			GameTooltip:AddLine("Not available right now", 1, 0.4, 0.4)
+		if self.mod == "click" or self.mod == "tab" then
+			if self.mod == "click" and not ChipAvailable(self) then
+				GameTooltip:AddLine("Not available right now", 1, 0.4, 0.4)
+			end
 		else
-			GameTooltip:AddLine("Hold the modifier to arm this row", 0.7, 0.7, 0.7)
+			local mod = CurrentMod()
+			if ChipActiveForMod(self, mod) and ChipAvailable(self) then
+				GameTooltip:AddLine("Live for this modifier", 0.4, 1, 0.4)
+			elseif not ChipAvailable(self) then
+				GameTooltip:AddLine("Not available right now", 1, 0.4, 0.4)
+			else
+				GameTooltip:AddLine("Hold the modifier to arm this row", 0.7, 0.7, 0.7)
+			end
 		end
 		GameTooltip:Show()
 	end)
@@ -1452,7 +1661,7 @@ end
 local function BuildUI()
 	local f = CreateFrame("Frame", "BotCtrlUI", UIParent)
 	f:SetWidth(322)
-	f:SetHeight(148)
+	f:SetHeight(210)
 	f:SetPoint(db.point or "CENTER", UIParent, db.relPoint or "CENTER", db.x or 0, db.y or -260)
 	f:SetFrameStrata("HIGH")
 	f:SetClampedToScreen(true)
@@ -1529,7 +1738,8 @@ local function BuildUI()
 		"Party 1-5, tank on Shift, DPS on Ctrl.",
 		"Override only - your saved action-bar binds stay.",
 		"/bot unbind to release 1-5.",
-		"Never bound: autogear, leave.",
+		"Always fight commands, whichever tab is open.",
+		"Never bound: autogear, leave, Strat, Orders, Quest.",
 	}, UTIL_COLOR, "BINDS", "util")
 	binds:SetPoint("RIGHT", setup, "LEFT", -3, 0)
 	binds.keyFs:SetText("")
@@ -1538,18 +1748,39 @@ local function BuildUI()
 	f.binds = binds
 	chips.BINDS = binds
 
-	local pageBtn = MakeChip(f, "Gear", "", 48, TogglePage, "Toggle Gear / Fight", {
-		"Combat page: follow, tank, DPS (1-5 / Shift / Ctrl).",
-		"Gear page: autogear, repair, talents, sell, leave.",
-		"1-5 still fire combat even on the Gear page.",
-		"Autogear and leave are never combat keys.",
-	}, UTIL_COLOR, "PAGE", "util")
-	pageBtn:SetPoint("RIGHT", binds, "LEFT", -3, 0)
-	pageBtn.keyFs:SetText("")
-	pageBtn.labelFs:ClearAllPoints()
-	pageBtn.labelFs:SetPoint("CENTER", pageBtn, "CENTER", 0, 0)
-	f.pageBtn = pageBtn
-	chips.PAGE = pageBtn
+	-- Tabs under the title, above the roster. Width 322: five 58px chips.
+	local TAB_SPEC = {
+		{ id = "combat", label = "Fight", color = PARTY_COLOR },
+		{ id = "gear", label = "Gear", color = GEAR_COLOR },
+		{ id = "strat", label = "Strat", color = { 0.10, 0.32, 0.34, 0.95 } },
+		{ id = "orders", label = "Orders", color = { 0.34, 0.26, 0.10, 0.95 } },
+		{ id = "quest", label = "Quest", color = { 0.12, 0.30, 0.22, 0.95 } },
+	}
+	local STRAT_COLOR = TAB_SPEC[3].color
+	local ORDER_COLOR = TAB_SPEC[4].color
+	local QUEST_COLOR = TAB_SPEC[5].color
+	local tabBtns = {}
+	for i = 1, #TAB_SPEC do
+		local spec = TAB_SPEC[i]
+		local b = MakeChip(f, spec.label, "", 58, function()
+			f:SetPage(spec.id)
+		end, spec.label .. " tab", {
+			"Show the " .. spec.label .. " chips.",
+			"1-5 / Shift / Ctrl still fire fight commands.",
+		}, UTIL_COLOR, nil, "tab")
+		b.pageId = spec.id
+		b.tabColor = spec.color
+		if i == 1 then
+			b:SetPoint("TOPLEFT", f, "TOPLEFT", 8, -32)
+		else
+			b:SetPoint("LEFT", tabBtns[i - 1], "RIGHT", 4, 0)
+		end
+		b.keyFs:SetText("")
+		b.labelFs:ClearAllPoints()
+		b.labelFs:SetPoint("CENTER", b, "CENTER", 0, 0)
+		tabBtns[i] = b
+	end
+	f.tabBtns = tabBtns
 
 	-- Clickable roster: left-click sets tank, right-click marks healer.
 	local rosterBtns = {}
@@ -1558,7 +1789,7 @@ local function BuildUI()
 		b:SetWidth(74)
 		b:SetHeight(16)
 		if i == 1 then
-			b:SetPoint("TOPLEFT", f, "TOPLEFT", 8, -26)
+			b:SetPoint("TOPLEFT", f, "TOPLEFT", 8, -58)
 		else
 			b:SetPoint("LEFT", rosterBtns[i - 1], "RIGHT", 3, 0)
 		end
@@ -1652,7 +1883,7 @@ local function BuildUI()
 		  title = "4  Drink", lines = { "Bots sit and drink. You drink too." } },
 		{ label = "Flee", key = "5", cmd = "FLEE", click = CmdFlee,
 		  title = "5  Run", lines = { "Party: ignore everything and run to you." } },
-	}, PARTY_COLOR, -44, nil, "party")
+	}, PARTY_COLOR, -78, nil, "party")
 
 	local tankRow = PlaceRow({
 		{ label = "Hold", key = "S1", cmd = "TANKHOLD", click = CmdTankHold,
@@ -1714,7 +1945,7 @@ local function BuildUI()
 		{ label = "Train", key = "", cmd = "TRAIN", click = CmdTrain,
 		  title = "Trainer learn",
 		  lines = { "Target a class/profession trainer, then click." } },
-	}, GEAR_COLOR, -44, nil, "gear")
+	}, GEAR_COLOR, -78, nil, "gear")
 
 	local gearRow2 = PlaceRow({
 		{ label = "Sell", key = "", cmd = "SELL", click = CmdSell,
@@ -1746,8 +1977,70 @@ local function BuildUI()
 		  lines = { "Click twice to confirm. Never on a combat key." } },
 	}, WARN_COLOR, gearRow2[1], -4, "gear")
 
+	local stratRow1 = PlaceRow({
+		ClickChip("+Boost", "co +boost", "SBOOST"),
+		ClickChip("-Boost", "co -boost", "SUNBOOST"),
+		ClickChip("+AoE", "co +aoe", "SAOE"),
+		ClickChip("-AoE", "co -aoe", "SUNAOE"),
+		ClickChip("Assist", "co +assist", "SASSIST"),
+	}, STRAT_COLOR, -78, nil, "click")
+
+	local stratRow2 = PlaceRow({
+		ClickChip("Threat", "co +threat", "STHREAT"),
+		ClickChip("CC", "co +cc", "SCC"),
+		ClickChip("Avoid", "co +avoid aoe", "SAVOID"),
+		ClickChip("Loot", "nc +loot", "SLOOT"),
+		ClickChip("co?", "co ?", "SCOQ"),
+	}, STRAT_COLOR, stratRow1[1], -4, "click")
+
+	local stratRow3 = PlaceRow({
+		ClickChip("nc?", "nc ?", "SNCQ"),
+	}, STRAT_COLOR, stratRow2[1], -4, "click")
+
+	local orderRow1 = PlaceRow({
+		ClickChip("Release", "release", "OREL"),
+		ClickChip("Revive", "revive", "OREV"),
+		ClickChip("Leader", "give leader", "OLEADER"),
+		ClickChip("Disp", "disperse disable", "ODISP"),
+	}, ORDER_COLOR, -78, nil, "click")
+
+	local orderRow2 = PlaceRow({
+		ClickChip("Gray", "ll gray", "OGRAY"),
+		ClickChip("Quest", "ll quest", "OQUEST"),
+		ClickChip("Skill", "ll skill", "OSKILL"),
+		ClickChip("All", "ll all", "OALL"),
+	}, ORDER_COLOR, orderRow1[1], -4, "click")
+
+	local orderRow3 = PlaceRow({
+		ClickChip("Open", "open items", "OOPEN"),
+		ClickChip("Vendor", "s vendor", "SVENDOR", { "Needs a vendor (not a player).", "Party chat. Click only." }, CmdVendorOrder),
+		ClickChip("Reset", "reset", "OSTUCK", {
+			"Stuck-cast order. Not reset botAI.",
+			"Not /bot reset (that moves the bar).",
+			"Party chat. Click only.",
+		}, CmdStuckReset),
+	}, ORDER_COLOR, orderRow2[1], -4, "click")
+
+	local orderRow4 = PlaceRow({
+		ClickChip("Attack", "pet attack", "PATTACK"),
+		ClickChip("Follow", "pet follow", "PFOLLOW"),
+		ClickChip("Stay", "pet stay", "PSTAY"),
+		ClickChip("Pass", "pet passive", "PPASS"),
+		ClickChip("Def", "pet defensive", "PDEF"),
+	}, ORDER_COLOR, orderRow3[1], -4, "click")
+
+	local questRow1 = PlaceRow({
+		ClickChip("Accept", "accept *", "QACCEPT", { "Needs a quest giver (not a player).", "Party chat. Click only." }, CmdQuestAccept),
+		ClickChip("Talk", "talk", "QTALK", { "Needs a quest giver (not a player).", "Party chat. Click only." }, CmdQuestTalk),
+		ClickChip("Quests", "quests", "QLOG"),
+		ClickChip("All", "quests all", "QALL"),
+	}, QUEST_COLOR, -78, nil, "click")
+
 	f.combatRows = { partyRow, tankRow, dpsRow }
 	f.gearRows = { gearRow1, gearRow2, gearRow3 }
+	f.stratRows = { stratRow1, stratRow2, stratRow3 }
+	f.orderRows = { orderRow1, orderRow2, orderRow3, orderRow4 }
+	f.questRows = { questRow1 }
 
 	f.rowGlows = {
 		party = MakeRowGlow(partyRow[1], partyRow[#partyRow]),
@@ -1785,26 +2078,41 @@ local function BuildUI()
 		end
 	end
 
+	local function PaintTabs()
+		if not f.tabBtns then return end
+		for i = 1, #f.tabBtns do
+			local b = f.tabBtns[i]
+			local on = b.pageId == f.page
+			b.color = on and b.tabColor or UTIL_COLOR
+		end
+	end
+
 	function f:SetPage(page)
-		if page ~= "gear" then
+		if page ~= "combat" and page ~= "gear" and page ~= "strat" and page ~= "orders" and page ~= "quest" then
 			page = "combat"
 		end
 		self.page = page
 		leaveArmedUntil = 0
-		local onGear = page == "gear"
-		ShowRows(self.combatRows, not onGear)
-		ShowRows(self.gearRows, onGear)
-		if self.pageBtn and self.pageBtn.labelFs then
-			self.pageBtn.labelFs:SetText(onGear and "Fight" or "Gear")
-			self.pageBtn.color = onGear and PARTY_COLOR or UTIL_COLOR
-		end
+		ShowRows(self.combatRows, page == "combat")
+		ShowRows(self.gearRows, page == "gear")
+		ShowRows(self.stratRows, page == "strat")
+		ShowRows(self.orderRows, page == "orders")
+		ShowRows(self.questRows, page == "quest")
+		PaintTabs()
 		ApplyModifierLook()
 	end
 
 	function f:RefreshStatus()
 		local extra = lastCmd ~= "" and ("  |cff888888" .. lastCmd .. "|r") or ""
-		if self.page == "gear" then
-			self.status:SetText("|cffc090ffGear page|r  autogear / repair / talents   (1-5 still combat)" .. extra)
+		if self.page ~= "combat" then
+			local names = {
+				gear = "|cffc090ffGear|r",
+				strat = "|cff7fd0d8Strat|r",
+				orders = "|ffffcc66Orders|r",
+				quest = "|cff7dffa0Quest|r",
+			}
+			local name = names[self.page] or "|cff888888tab|r"
+			self.status:SetText(name .. "   |cff8888881-5 still fight|r" .. extra)
 			return
 		end
 		local mod = CurrentMod()
@@ -1852,10 +2160,12 @@ local function BuildUI()
 			self.setup.labelFs:SetText(setupDone and "Set" or "Setup")
 			self.setup.color = setupDone and LOOP_COLOR or UTIL_COLOR
 		end
-		if self.pageBtn and self.pageBtn.labelFs then
-			local onGear = self.page == "gear"
-			self.pageBtn.labelFs:SetText(onGear and "Fight" or "Gear")
-			self.pageBtn.color = onGear and PARTY_COLOR or UTIL_COLOR
+		if self.tabBtns then
+			for i = 1, #self.tabBtns do
+				local b = self.tabBtns[i]
+				local on = b.pageId == self.page
+				b.color = on and b.tabColor or UTIL_COLOR
+			end
 		end
 		if self.chips and self.chips.MARK and self.chips.MARK.labelFs then
 			local on = db.markEnabled
@@ -1910,7 +2220,7 @@ driver:SetScript("OnEvent", function(self, event, ...)
 		end
 		BuildUI()
 		ApplyBinds()
-		Print("loaded. Binds 1-5, Gear tab, Mark on the tank row. Setup once after invite. /bot")
+		Print("loaded. Tabs: Fight, Gear, Strat, Orders, Quest. 1-5 always fight. /bot")
 	elseif event == "PLAYER_ENTERING_WORLD" then
 		local inInstance, itype = IsInInstance()
 		if inInstance and (itype == "party" or itype == "raid") then
@@ -1957,6 +2267,7 @@ end)
 
 driver:SetScript("OnUpdate", function(self, dt)
 	FlushQueue(dt)
+	TickTankAnchor(dt)
 	FlashTick(dt)
 	local mod = CurrentMod()
 	if mod ~= lastModKey then
@@ -2000,13 +2311,14 @@ SlashCmdList["BOTCTRL"] = function(msg)
 	rest = rest or ""
 
 	if cmd == "" or cmd == "help" then
+		Print("/bot fight|combat  gear|prep  strat  orders  quest")
 		Print("/bot follow stay summon drink flee hold pull go kill burn skull water setup loop")
 		Print("/bot mark  /bot clear  /bot melee   (pack marks, folded in from PackMark)")
-		Print("/bot gear | fight   (toggle prep page)")
 		Print("/bot autogear maint repair talents train sell food home stats loot resetai leave")
 		Print("/bot tank Name  |  /bot dps Name  |  /bot heal Name")
 		Print("/bot binds  /bot unbind  /bot show  /bot hide  /bot lock  /bot reset")
-		Print("Combat keys never send autogear or leave.")
+		Print("1-5 / Shift / Ctrl always fight, on every tab. /bot reset moves the bar.")
+		Print("Combat keys never send autogear, leave, or Strat / Orders / Quest.")
 	elseif COMMANDS[cmd:upper()] then
 		COMMANDS[cmd:upper()]()
 	elseif cmd == "hold" then
@@ -2084,6 +2396,12 @@ SlashCmdList["BOTCTRL"] = function(msg)
 		if ui and ui.SetPage then ui:SetPage("gear") end
 	elseif cmd == "fight" or cmd == "combat" then
 		if ui and ui.SetPage then ui:SetPage("combat") end
+	elseif cmd == "strat" then
+		if ui and ui.SetPage then ui:SetPage("strat") end
+	elseif cmd == "orders" then
+		if ui and ui.SetPage then ui:SetPage("orders") end
+	elseif cmd == "quest" then
+		if ui and ui.SetPage then ui:SetPage("quest") end
 	elseif cmd == "maint" then
 		CmdMaint()
 	elseif cmd == "train" then
