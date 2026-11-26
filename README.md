@@ -95,7 +95,7 @@ Switching tabs disarms Leave. Train / Sell / Home only light up with a trainer, 
 | Leader | `give leader` |
 | Disp | `disperse disable` |
 | Gray | `ll gray` |
-| Quest | `ll quest` |
+| LQuest | `ll quest` |
 | Skill | `ll skill` |
 | All | `ll all` |
 | Open | `open items` |

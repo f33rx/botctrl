@@ -2006,7 +2006,7 @@ local function BuildUI()
 
 	local orderRow2 = PlaceRow({
 		ClickChip("Gray", "ll gray", "OGRAY"),
-		ClickChip("Quest", "ll quest", "OQUEST"),
+		ClickChip("LQuest", "ll quest", "OQUEST"),
 		ClickChip("Skill", "ll skill", "OSKILL"),
 		ClickChip("All", "ll all", "OALL"),
 	}, ORDER_COLOR, orderRow1[1], -4, "click")
@@ -2084,6 +2084,7 @@ local function BuildUI()
 			local b = f.tabBtns[i]
 			local on = b.pageId == f.page
 			b.color = on and b.tabColor or UTIL_COLOR
+			PaintChip(b)
 		end
 	end
 
@@ -2165,6 +2166,7 @@ local function BuildUI()
 				local b = self.tabBtns[i]
 				local on = b.pageId == self.page
 				b.color = on and b.tabColor or UTIL_COLOR
+				PaintChip(b)
 			end
 		end
 		if self.chips and self.chips.MARK and self.chips.MARK.labelFs then

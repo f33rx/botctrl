@@ -153,7 +153,7 @@
     <g transform="translate(194,82)"><use href="#c" fill="#57421a"/><text class="lbl" x="29" y="15">Disp</text></g>
 
     <g transform="translate(8,108)"><use href="#c" fill="#57421a"/><text class="lbl" x="29" y="15">Gray</text></g>
-    <g transform="translate(70,108)"><use href="#c" fill="#57421a"/><text class="lbl" x="29" y="15">Quest</text></g>
+    <g transform="translate(70,108)"><use href="#c" fill="#57421a"/><text class="lbl" x="29" y="15">LQuest</text></g>
     <g transform="translate(132,108)"><use href="#c" fill="#57421a"/><text class="lbl" x="29" y="15">Skill</text></g>
     <g transform="translate(194,108)"><use href="#c" fill="#57421a"/><text class="lbl" x="29" y="15">All</text></g>
 
