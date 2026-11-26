@@ -91,11 +91,13 @@ local defaults = {
 	clearOnCombatEnd = true,
 }
 
-local db
-local ui
-local setupDone = false
+local box = {}
+box.db = nil
+box.ui = nil
+box.setupDone = false
+box.lastCmd = ""
+box.leaveArmedUntil = 0
 local loopIndex = 1
-local lastCmd = ""
 -- Tank follow makes him peel back to the healer mid-cast. Stay once he
 -- is planted on the pack; follow again after the group drops combat.
 local tankAnchor = "follow"
@@ -104,7 +106,7 @@ local tankEngaged = 0
 local bindsPending = false
 local queue = {}
 local qElapsed = 0
-local rosterCache = { tank = nil, dps = {}, heal = {}, mage = {}, all = {} }
+box.rosterCache = { tank = nil, dps = {}, heal = {}, mage = {}, all = {} }
 
 local driver = CreateFrame("Frame")
 
@@ -197,7 +199,7 @@ local function Party(msg)
 		return false
 	end
 	Enqueue(msg, ChatChan(), nil)
-	lastCmd = "/p " .. msg
+	box.lastCmd = "/p " .. msg
 	return true
 end
 
@@ -207,7 +209,7 @@ local function Whisper(name, msg)
 		return false
 	end
 	Enqueue(msg, "WHISPER", name)
-	lastCmd = "/w " .. name .. " " .. msg
+	box.lastCmd = "/w " .. name .. " " .. msg
 	return true
 end
 
@@ -227,8 +229,8 @@ local function FlushQueue(dt)
 	else
 		SendChatMessage(item.msg, item.chan)
 	end
-	if ui and ui.RefreshStatus then
-		ui:RefreshStatus()
+	if box.ui and box.ui.RefreshStatus then
+		box.ui:RefreshStatus()
 	end
 end
 
@@ -283,14 +285,14 @@ local function RebuildRoster()
 	local all = {}
 	local mages = {}
 	local named = {}
-	local prevTank = rosterCache.tank and rosterCache.tank.name
+	local prevTank = box.rosterCache.tank and box.rosterCache.tank.name
 
 	EachMember(function(unit, name, classFile)
 		local rec = {
 			unit = unit,
 			name = name,
 			class = classFile,
-			role = db and db.roles[name] or nil,
+			role = box.db and box.db.roles[name] or nil,
 		}
 		all[#all + 1] = rec
 		named[name] = rec
@@ -342,11 +344,11 @@ local function RebuildRoster()
 		end
 	end
 
-	if tank and db then
-		db.tankName = tank.name
+	if tank and box.db then
+		box.db.tankName = tank.name
 	end
 
-	rosterCache = {
+	box.rosterCache = {
 		tank = tank,
 		dps = dps,
 		heal = heal,
@@ -354,11 +356,11 @@ local function RebuildRoster()
 		all = all,
 		named = named,
 	}
-	return rosterCache
+	return box.rosterCache
 end
 
 local function TankName()
-	local r = rosterCache.tank
+	local r = box.rosterCache.tank
 	return r and r.name or nil
 end
 
@@ -380,7 +382,7 @@ local function TickTankAnchor(dt)
 	if not InGroup() then
 		return
 	end
-	local rec = rosterCache.tank
+	local rec = box.rosterCache.tank
 	if not rec or not rec.name or not rec.unit or not UnitExists(rec.unit) then
 		return
 	end
@@ -427,25 +429,25 @@ local function TickTankAnchor(dt)
 end
 
 local function SetRole(name, role)
-	if not db or not name then return end
+	if not box.db or not name then return end
 	if role == "tank" then
-		for n, r in pairs(db.roles) do
+		for n, r in pairs(box.db.roles) do
 			if r == "tank" and n ~= name then
-				db.roles[n] = "dps"
+				box.db.roles[n] = "dps"
 			end
 		end
-		db.roles[name] = "tank"
-		db.tankName = name
+		box.db.roles[name] = "tank"
+		box.db.tankName = name
 	else
-		db.roles[name] = role
-		if db.tankName == name and role ~= "tank" then
-			db.tankName = nil
+		box.db.roles[name] = role
+		if box.db.tankName == name and role ~= "tank" then
+			box.db.tankName = nil
 		end
 	end
-	setupDone = false
+	box.setupDone = false
 	RebuildRoster()
-	if ui and ui.Refresh then
-		ui:Refresh()
+	if box.ui and box.ui.Refresh then
+		box.ui:Refresh()
 	end
 end
 
@@ -453,8 +455,8 @@ local function ResolveName(raw)
 	if not raw or raw == "" then return nil end
 	RebuildRoster()
 	local lower = raw:lower()
-	if rosterCache.named then
-		for name in pairs(rosterCache.named) do
+	if box.rosterCache.named then
+		for name in pairs(box.rosterCache.named) do
 			if name:lower() == lower then
 				return name
 			end
@@ -703,7 +705,7 @@ local function RankPack()
 	for i = 1, #list do
 		local rec = list[i]
 		if not rec.mark then
-			if (not db or db.markMelee) or rec.score >= 65 then
+			if (not box.db or box.db.markMelee) or rec.score >= 65 then
 				local m = NextFreeMark(used)
 				if m then
 					rec.mark = m
@@ -720,12 +722,12 @@ end
 local function ClearRti()
 	if InGroup() then
 		Enqueue("rti none", ChatChan(), nil)
-		lastCmd = "/p rti none"
+		box.lastCmd = "/p rti none"
 	end
 end
 
 local function ApplyVisible()
-	if not db or not db.markEnabled then return end
+	if not box.db or not box.db.markEnabled then return end
 	if not CanMark() then
 		if InRaid() and not announcedGroup then
 			Print("Need raid lead or assist to mark.")
@@ -775,8 +777,8 @@ local function ApplyVisible()
 		end
 	end
 
-	if ui and ui.RefreshStatus then
-		ui:RefreshStatus()
+	if box.ui and box.ui.RefreshStatus then
+		box.ui:RefreshStatus()
 	end
 end
 
@@ -799,18 +801,18 @@ local function ClearMarks()
 		end
 	end
 	wipe(pack)
-	if ui and ui.RefreshStatus then
-		ui:RefreshStatus()
+	if box.ui and box.ui.RefreshStatus then
+		box.ui:RefreshStatus()
 	end
 end
 
 local function WipePack()
 	wipe(pack)
 	wipe(seenCast)
-	if db and db.clearOnCombatEnd then
+	if box.db and box.db.clearOnCombatEnd then
 		ClearMarks()
-	elseif ui and ui.RefreshStatus then
-		ui:RefreshStatus()
+	elseif box.ui and box.ui.RefreshStatus then
+		box.ui:RefreshStatus()
 	end
 end
 
@@ -846,7 +848,7 @@ local function MobShort(name)
 end
 
 local function MarkStatusText()
-	if not db or not db.markEnabled then
+	if not box.db or not box.db.markEnabled then
 		return nil
 	end
 	local ranked = PackList()
@@ -880,7 +882,7 @@ local function NoteCast(subevent, sourceGUID, destGUID)
 		if destGUID and pack[destGUID] then
 			pack[destGUID] = nil
 			seenCast[destGUID] = nil
-			if db and db.markEnabled then
+			if box.db and box.db.markEnabled then
 				ApplyVisible()
 			end
 		end
@@ -1010,18 +1012,18 @@ local function CmdSkull()
 end
 
 local function CmdMarkToggle()
-	if not db then return end
-	db.markEnabled = not db.markEnabled
+	if not box.db then return end
+	box.db.markEnabled = not box.db.markEnabled
 	announcedGroup = false
-	if db.markEnabled then
+	if box.db.markEnabled then
 		ClearRti()
 		Print("Mark ON - hover nameplates (V). Icons only, no attack. Pull / Go / Kill to fight.")
 		ApplyVisible()
 	else
 		Print("Mark OFF")
 	end
-	if ui and ui.Refresh then
-		ui:Refresh()
+	if box.ui and box.ui.Refresh then
+		box.ui:Refresh()
 	end
 	return true
 end
@@ -1035,12 +1037,12 @@ end
 
 local function CmdWater()
 	RebuildRoster()
-	if #rosterCache.mage == 0 then
+	if #box.rosterCache.mage == 0 then
 		Print("No mage in the party.")
 		return
 	end
-	for i = 1, #rosterCache.mage do
-		Whisper(rosterCache.mage[i].name, "cast conjure water")
+	for i = 1, #box.rosterCache.mage do
+		Whisper(box.rosterCache.mage[i].name, "cast conjure water")
 	end
 	Print("Mage: conjure water")
 	return true
@@ -1056,16 +1058,16 @@ local function CmdSetup()
 	end
 	Whisper(tank, "co +tank")
 	Whisper(tank, "nc +follow")
-	for i = 1, #rosterCache.dps do
-		Whisper(rosterCache.dps[i].name, "co +dps")
+	for i = 1, #box.rosterCache.dps do
+		Whisper(box.rosterCache.dps[i].name, "co +dps")
 	end
-	for i = 1, #rosterCache.heal do
-		Whisper(rosterCache.heal[i].name, "co +heal")
+	for i = 1, #box.rosterCache.heal do
+		Whisper(box.rosterCache.heal[i].name, "co +heal")
 	end
-	setupDone = true
+	box.setupDone = true
 	Print("Roles sent. Tank " .. tank .. " (follow out of combat). Once per session.")
-	if ui and ui.Refresh then
-		ui:Refresh()
+	if box.ui and box.ui.Refresh then
+		box.ui:Refresh()
 	end
 	return true
 end
@@ -1133,17 +1135,16 @@ local function CmdResetAI()
 	return CmdPrep("reset botAI", "Reset bot AI")
 end
 
-local leaveArmedUntil = 0
 local function CmdLeave()
 	if not NeedGroup() then return end
 	local now = GetTime()
-	if now < leaveArmedUntil then
-		leaveArmedUntil = 0
+	if now < box.leaveArmedUntil then
+		box.leaveArmedUntil = 0
 		Party("leave")
 		Print("Bots leaving the party.")
 		return true
 	end
-	leaveArmedUntil = now + 4
+	box.leaveArmedUntil = now + 4
 	Print("Leave armed. Click Leave again in 4s to confirm.")
 	return
 end
@@ -1253,8 +1254,8 @@ local function CmdLoop()
 			loopIndex = 4 -- next pack: tank pull
 		end
 	end
-	if ui and ui.Refresh then
-		ui:Refresh()
+	if box.ui and box.ui.Refresh then
+		box.ui:Refresh()
 	end
 end
 
@@ -1290,8 +1291,8 @@ local COMMANDS = {
 }
 
 function BotCtrl_Bind(which)
-	if ui and ui.Flash then
-		ui:Flash(which)
+	if box.ui and box.ui.Flash then
+		box.ui:Flash(which)
 	end
 	local fn = COMMANDS[which]
 	if fn then
@@ -1315,7 +1316,7 @@ local function ApplyBinds()
 		return
 	end
 	ClearOverrideBindings(driver)
-	if not db or not db.useBinds then
+	if not box.db or not box.db.useBinds then
 		bindsPending = false
 		return
 	end
@@ -1331,15 +1332,15 @@ local function ToggleBinds()
 		Print("Can't change binds in combat.")
 		return
 	end
-	db.useBinds = not db.useBinds
+	box.db.useBinds = not box.db.useBinds
 	ApplyBinds()
-	if db.useBinds then
+	if box.db.useBinds then
 		Print("1-5 party, Shift tank, Ctrl DPS. Action-bar 1-5 is covered while this is on. /bot unbind to restore.")
 	else
 		Print("Override binds off. Action-bar 1-5 is yours again.")
 	end
-	if ui and ui.Refresh then
-		ui:Refresh()
+	if box.ui and box.ui.Refresh then
+		box.ui:Refresh()
 	end
 end
 
@@ -1409,7 +1410,7 @@ local function ChipAvailable(b)
 		return UnitExists("target") and not UnitIsFriend("player", "target")
 	end
 	if cmd == "WATER" then
-		return rosterCache.mage and #rosterCache.mage > 0
+		return box.rosterCache.mage and #box.rosterCache.mage > 0
 	end
 	if cmd == "SKULL" then
 		if HasPackSkull() then return true end
@@ -1427,12 +1428,12 @@ local function ChipActiveForMod(b, mod)
 		return false
 	end
 	if b.mod == "gear" then
-		return ui and ui.page == "gear"
+		return box.ui and box.ui.page == "gear"
 	end
 	if b.mod == "mark" then
-		return ui and ui.page == "combat"
+		return box.ui and box.ui.page == "combat"
 	end
-	if ui and ui.page ~= "combat" then
+	if box.ui and box.ui.page ~= "combat" then
 		return false
 	end
 	if b.mod == "party" then return mod == "none" end
@@ -1493,13 +1494,13 @@ local function PaintChip(b)
 end
 
 local function ApplyModifierLook()
-	if not ui then return end
+	if not box.ui then return end
 	local mod = CurrentMod()
 	lastModKey = mod
-	if ui.rowGlows then
-		local g = ui.rowGlows
-		local onCombat = ui.page == "combat"
-		local onGear = ui.page == "gear"
+	if box.ui.rowGlows then
+		local g = box.ui.rowGlows
+		local onCombat = box.ui.page == "combat"
+		local onGear = box.ui.page == "gear"
 		if g.party then g.party:SetAlpha((onCombat and mod == "none") and 0.42 or 0) end
 		if g.tank then g.tank:SetAlpha((onCombat and mod == "shift") and 0.50 or 0) end
 		if g.dps then g.dps:SetAlpha((onCombat and mod == "ctrl") and 0.50 or 0) end
@@ -1508,13 +1509,13 @@ local function ApplyModifierLook()
 		if g.gear2 then g.gear2:SetAlpha(gearA) end
 		if g.gear3 then g.gear3:SetAlpha(gearA) end
 	end
-	if ui.chips then
-		for _, b in pairs(ui.chips) do
+	if box.ui.chips then
+		for _, b in pairs(box.ui.chips) do
 			PaintChip(b)
 		end
 	end
-	if ui.RefreshStatus then
-		ui:RefreshStatus()
+	if box.ui.RefreshStatus then
+		box.ui:RefreshStatus()
 	end
 end
 
@@ -1539,10 +1540,10 @@ end
 
 local function SavePosition(frame)
 	local point, _, relPoint, x, y = frame:GetPoint()
-	db.point = point
-	db.relPoint = relPoint
-	db.x = x
-	db.y = y
+	box.db.point = point
+	box.db.relPoint = relPoint
+	box.db.x = x
+	box.db.y = y
 end
 
 local function Tip(frame, title, lines)
@@ -1658,11 +1659,68 @@ local function NextLoopLabel()
 	return "Next: " .. step.label
 end
 
+-- One table so BuildUI stays under Lua 5.1's 60-upvalue cap.
+box.SavePosition = SavePosition
+box.Tip = Tip
+box.MakeChip = MakeChip
+box.CmdSetup = CmdSetup
+box.UTIL_COLOR = UTIL_COLOR
+box.ToggleBinds = ToggleBinds
+box.PARTY_COLOR = PARTY_COLOR
+box.GEAR_COLOR = GEAR_COLOR
+box.SetRole = SetRole
+box.Print = Print
+box.CmdFollow = CmdFollow
+box.CmdStay = CmdStay
+box.CmdSummon = CmdSummon
+box.CmdDrink = CmdDrink
+box.CmdFlee = CmdFlee
+box.CmdTankHold = CmdTankHold
+box.CmdTankPull = CmdTankPull
+box.CmdTankGo = CmdTankGo
+box.CmdMarkToggle = CmdMarkToggle
+box.CmdMarkClear = CmdMarkClear
+box.TANK_COLOR = TANK_COLOR
+box.CmdAttack = CmdAttack
+box.CmdBurn = CmdBurn
+box.CmdSkull = CmdSkull
+box.CmdWater = CmdWater
+box.CmdLoop = CmdLoop
+box.LOOP_COLOR = LOOP_COLOR
+box.DPS_COLOR = DPS_COLOR
+box.CmdAutogear = CmdAutogear
+box.CmdMaint = CmdMaint
+box.CmdRepair = CmdRepair
+box.CmdTalents = CmdTalents
+box.CmdTrain = CmdTrain
+box.CmdSell = CmdSell
+box.CmdFood = CmdFood
+box.CmdHome = CmdHome
+box.CmdStats = CmdStats
+box.CmdLoot = CmdLoot
+box.CmdResetAI = CmdResetAI
+box.WARN_COLOR = WARN_COLOR
+box.CmdLeave = CmdLeave
+box.ClickChip = ClickChip
+box.CmdVendorOrder = CmdVendorOrder
+box.CmdStuckReset = CmdStuckReset
+box.CmdQuestAccept = CmdQuestAccept
+box.CmdQuestTalk = CmdQuestTalk
+box.FlashBtn = FlashBtn
+box.PaintChip = PaintChip
+box.ApplyModifierLook = ApplyModifierLook
+box.CurrentMod = CurrentMod
+box.MarkStatusText = MarkStatusText
+box.NextLoopLabel = NextLoopLabel
+box.RebuildRoster = RebuildRoster
+box.ClassColor = ClassColor
+box.ShortName = ShortName
+
 local function BuildUI()
 	local f = CreateFrame("Frame", "BotCtrlUI", UIParent)
 	f:SetWidth(322)
 	f:SetHeight(210)
-	f:SetPoint(db.point or "CENTER", UIParent, db.relPoint or "CENTER", db.x or 0, db.y or -260)
+	f:SetPoint(box.db.point or "CENTER", UIParent, box.db.relPoint or "CENTER", box.db.x or 0, box.db.y or -260)
 	f:SetFrameStrata("HIGH")
 	f:SetClampedToScreen(true)
 	f:SetMovable(true)
@@ -1678,13 +1736,13 @@ local function BuildUI()
 	f:SetBackdropBorderColor(0.65, 0.55, 0.20, 0.9)
 
 	f:SetScript("OnDragStart", function(self)
-		if not db.locked then
+		if not box.db.locked then
 			self:StartMoving()
 		end
 	end)
 	f:SetScript("OnDragStop", function(self)
 		self:StopMovingOrSizing()
-		SavePosition(self)
+		box.SavePosition(self)
 	end)
 
 	local icon = f:CreateTexture(nil, "ARTWORK")
@@ -1706,15 +1764,15 @@ local function BuildUI()
 	lockTex:SetTexture("Interface\\Buttons\\LockButton-Unlocked-Up")
 	lock.tex = lockTex
 	lock:SetScript("OnClick", function()
-		db.locked = not db.locked
-		if db.locked then
+		box.db.locked = not box.db.locked
+		if box.db.locked then
 			lock.tex:SetTexture("Interface\\Buttons\\LockButton-Locked-Up")
 		else
 			lock.tex:SetTexture("Interface\\Buttons\\LockButton-Unlocked-Up")
 		end
 	end)
-	Tip(lock, "Lock bar", { "Stop the bar from moving. Drag the frame to place it." })
-	if db.locked then
+	box.Tip(lock, "Lock bar", { "Stop the bar from moving. Drag the frame to place it." })
+	if box.db.locked then
 		lockTex:SetTexture("Interface\\Buttons\\LockButton-Locked-Up")
 	end
 	f.lock = lock
@@ -1722,11 +1780,11 @@ local function BuildUI()
 	local chips = {}
 	f.chips = chips
 
-	local setup = MakeChip(f, "Setup", "", 48, CmdSetup, "Setup roles (once per session)", {
+	local setup = box.MakeChip(f, "Setup", "", 48, box.CmdSetup, "Setup roles (once per session)", {
 		"Whispers co +tank / nc +follow to the tank,",
 		"co +dps to everyone else.",
 		"Not a combat key. Run after invite.",
-	}, UTIL_COLOR, "SETUP", "util")
+	}, box.UTIL_COLOR, "SETUP", "util")
 	setup:SetPoint("RIGHT", lock, "LEFT", -4, 0)
 	setup.keyFs:SetText("")
 	setup.labelFs:ClearAllPoints()
@@ -1734,13 +1792,13 @@ local function BuildUI()
 	f.setup = setup
 	chips.SETUP = setup
 
-	local binds = MakeChip(f, "Binds", "", 48, ToggleBinds, "Bind 1-5 / Shift / Ctrl", {
+	local binds = box.MakeChip(f, "Binds", "", 48, box.ToggleBinds, "Bind 1-5 / Shift / Ctrl", {
 		"Party 1-5, tank on Shift, DPS on Ctrl.",
 		"Override only - your saved action-bar binds stay.",
 		"/bot unbind to release 1-5.",
 		"Always fight commands, whichever tab is open.",
 		"Never bound: autogear, leave, Strat, Orders, Quest.",
-	}, UTIL_COLOR, "BINDS", "util")
+	}, box.UTIL_COLOR, "BINDS", "util")
 	binds:SetPoint("RIGHT", setup, "LEFT", -3, 0)
 	binds.keyFs:SetText("")
 	binds.labelFs:ClearAllPoints()
@@ -1750,8 +1808,8 @@ local function BuildUI()
 
 	-- Tabs under the title, above the roster. Width 322: five 58px chips.
 	local TAB_SPEC = {
-		{ id = "combat", label = "Fight", color = PARTY_COLOR },
-		{ id = "gear", label = "Gear", color = GEAR_COLOR },
+		{ id = "combat", label = "Fight", color = box.PARTY_COLOR },
+		{ id = "gear", label = "Gear", color = box.GEAR_COLOR },
 		{ id = "strat", label = "Strat", color = { 0.10, 0.32, 0.34, 0.95 } },
 		{ id = "orders", label = "Orders", color = { 0.34, 0.26, 0.10, 0.95 } },
 		{ id = "quest", label = "Quest", color = { 0.12, 0.30, 0.22, 0.95 } },
@@ -1762,12 +1820,12 @@ local function BuildUI()
 	local tabBtns = {}
 	for i = 1, #TAB_SPEC do
 		local spec = TAB_SPEC[i]
-		local b = MakeChip(f, spec.label, "", 58, function()
+		local b = box.MakeChip(f, spec.label, "", 58, function()
 			f:SetPage(spec.id)
 		end, spec.label .. " tab", {
 			"Show the " .. spec.label .. " chips.",
 			"1-5 / Shift / Ctrl still fire fight commands.",
-		}, UTIL_COLOR, nil, "tab")
+		}, box.UTIL_COLOR, nil, "tab")
 		b.pageId = spec.id
 		b.tabColor = spec.color
 		if i == 1 then
@@ -1801,17 +1859,17 @@ local function BuildUI()
 		b:SetScript("OnClick", function(self, button)
 			if not self.botName then return end
 			if button == "RightButton" then
-				local rec = rosterCache.named and rosterCache.named[self.botName]
+				local rec = box.rosterCache.named and box.rosterCache.named[self.botName]
 				if rec and rec.role == "heal" then
-					SetRole(self.botName, "dps")
-					Print(self.botName .. " -> DPS")
+					box.SetRole(self.botName, "dps")
+					box.Print(self.botName .. " -> DPS")
 				else
-					SetRole(self.botName, "heal")
-					Print(self.botName .. " -> heal")
+					box.SetRole(self.botName, "heal")
+					box.Print(self.botName .. " -> heal")
 				end
 			else
-				SetRole(self.botName, "tank")
-				Print(self.botName .. " -> tank")
+				box.SetRole(self.botName, "tank")
+				box.Print(self.botName .. " -> tank")
 			end
 		end)
 		b:SetScript("OnEnter", function(self)
@@ -1839,7 +1897,7 @@ local function BuildUI()
 		local row = {}
 		for i = 1, #specs do
 			local s = specs[i]
-			local b = MakeChip(f, s.label, s.key, s.width or w, s.click, s.title, s.lines, s.color or color, s.cmd, s.mod or mod)
+			local b = box.MakeChip(f, s.label, s.key, s.width or w, s.click, s.title, s.lines, s.color or color, s.cmd, s.mod or mod)
 			if i == 1 then
 				if type(anchor) == "table" then
 					b:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, yOff or -4)
@@ -1873,167 +1931,167 @@ local function BuildUI()
 	end
 
 	local partyRow = PlaceRow({
-		{ label = "Follow", key = "1", cmd = "FOLLOW", click = CmdFollow,
+		{ label = "Follow", key = "1", cmd = "FOLLOW", click = box.CmdFollow,
 		  title = "1  Follow", lines = { "Party: follow you." } },
-		{ label = "Stay", key = "2", cmd = "STAY", click = CmdStay,
+		{ label = "Stay", key = "2", cmd = "STAY", click = box.CmdStay,
 		  title = "2  Hold", lines = { "Party: stay put." } },
-		{ label = "Summon", key = "3", cmd = "SUMMON", click = CmdSummon,
+		{ label = "Summon", key = "3", cmd = "SUMMON", click = box.CmdSummon,
 		  title = "3  Summon", lines = { "After a wipe or inside an instance." } },
-		{ label = "Drink", key = "4", cmd = "DRINK", click = CmdDrink,
+		{ label = "Drink", key = "4", cmd = "DRINK", click = box.CmdDrink,
 		  title = "4  Drink", lines = { "Bots sit and drink. You drink too." } },
-		{ label = "Flee", key = "5", cmd = "FLEE", click = CmdFlee,
+		{ label = "Flee", key = "5", cmd = "FLEE", click = box.CmdFlee,
 		  title = "5  Run", lines = { "Party: ignore everything and run to you." } },
-	}, PARTY_COLOR, -78, nil, "party")
+	}, box.PARTY_COLOR, -78, nil, "party")
 
 	local tankRow = PlaceRow({
-		{ label = "Hold", key = "S1", cmd = "TANKHOLD", click = CmdTankHold,
+		{ label = "Hold", key = "S1", cmd = "TANKHOLD", click = box.CmdTankHold,
 		  title = "Shift-1  Tank hold",
 		  lines = { "Whisper tank: follow, then stay.", "DPS keep following you." } },
-		{ label = "Pull", key = "S2", cmd = "TANKPULL", click = CmdTankPull,
+		{ label = "Pull", key = "S2", cmd = "TANKPULL", click = box.CmdTankPull,
 		  title = "Shift-2  Open pack",
 		  lines = { "Whisper tank: pull your target." } },
-		{ label = "Go", key = "S3", cmd = "TANKGO", click = CmdTankGo,
+		{ label = "Go", key = "S3", cmd = "TANKGO", click = box.CmdTankGo,
 		  title = "Shift-3  Tank go",
 		  lines = { "Party: tank attack" } },
-		{ label = "Mark", key = "", cmd = "MARK", click = CmdMarkToggle, mod = "mark", color = UTIL_COLOR,
+		{ label = "Mark", key = "", cmd = "MARK", click = box.CmdMarkToggle, mod = "mark", color = box.UTIL_COLOR,
 		  title = "Pack mark (no combat)",
 		  lines = {
 			"Hover nameplates (V): casters/healers get skull.",
 			"Icons only. Bots will not attack until Pull, Go, or Kill.",
 			"Not a Shift key. Click only.",
 		  } },
-		{ label = "Clear", key = "", cmd = "CLEAR", click = CmdMarkClear, mod = "mark", color = UTIL_COLOR,
+		{ label = "Clear", key = "", cmd = "CLEAR", click = box.CmdMarkClear, mod = "mark", color = box.UTIL_COLOR,
 		  title = "Clear marks",
 		  lines = { "Wipe raid markers on the pack." } },
-	}, TANK_COLOR, partyRow[1], -4, "tank")
+	}, box.TANK_COLOR, partyRow[1], -4, "tank")
 
 	local dpsRow = PlaceRow({
-		{ label = "Kill", key = "C1", cmd = "ATTACK", click = CmdAttack,
+		{ label = "Kill", key = "C1", cmd = "ATTACK", click = box.CmdAttack,
 		  title = "Ctrl-1  Kill target",
 		  lines = { "Party: attack your target." } },
-		{ label = "Burn", key = "C2", cmd = "BURN", click = CmdBurn,
+		{ label = "Burn", key = "C2", cmd = "BURN", click = box.CmdBurn,
 		  title = "Ctrl-2  Burn",
 		  lines = { "Party: max dps" } },
-		{ label = "Skull", key = "C3", cmd = "SKULL", click = CmdSkull,
+		{ label = "Skull", key = "C3", cmd = "SKULL", click = box.CmdSkull,
 		  title = "Ctrl-3  Kill order",
 		  lines = { "rti skull + attack. This is the go-ahead to fight the mark." } },
-		{ label = "Water", key = "C4", cmd = "WATER", click = CmdWater,
+		{ label = "Water", key = "C4", cmd = "WATER", click = box.CmdWater,
 		  title = "Ctrl-4  Mage water",
 		  lines = { "Whispers every mage: cast conjure water." } },
-		{ label = "Loop", key = "C5", cmd = "LOOP", click = CmdLoop, color = LOOP_COLOR,
+		{ label = "Loop", key = "C5", cmd = "LOOP", click = box.CmdLoop, color = box.LOOP_COLOR,
 		  title = "Ctrl-5  Dungeon loop",
 		  lines = {
 			"summon -> follow -> drink -> tank pull ->",
 			"skull+attack -> stay -> drink -> follow.",
 			"After a wipe it starts at summon.",
 		  } },
-	}, DPS_COLOR, tankRow[1], -4, "dps")
+	}, box.DPS_COLOR, tankRow[1], -4, "dps")
 
 	local gearRow1 = PlaceRow({
-		{ label = "Gear", key = "", cmd = "AUTOGEAR", click = CmdAutogear,
+		{ label = "Gear", key = "", cmd = "AUTOGEAR", click = box.CmdAutogear,
 		  title = "Autogear",
 		  lines = { "Party: autogear. Out of combat. Not a combat key." } },
-		{ label = "Maint", key = "", cmd = "MAINT", click = CmdMaint,
+		{ label = "Maint", key = "", cmd = "MAINT", click = box.CmdMaint,
 		  title = "Maintenance",
 		  lines = { "Party: maintenance (food, bags, upkeep)." } },
-		{ label = "Repair", key = "", cmd = "REPAIR", click = CmdRepair,
+		{ label = "Repair", key = "", cmd = "REPAIR", click = box.CmdRepair,
 		  title = "Repair",
 		  lines = { "Party: repair. Target a repair vendor." } },
-		{ label = "Talent", key = "", cmd = "TALENTS", click = CmdTalents,
+		{ label = "Talent", key = "", cmd = "TALENTS", click = box.CmdTalents,
 		  title = "Talents",
 		  lines = { "Party: talents. Bots apply their spec." } },
-		{ label = "Train", key = "", cmd = "TRAIN", click = CmdTrain,
+		{ label = "Train", key = "", cmd = "TRAIN", click = box.CmdTrain,
 		  title = "Trainer learn",
 		  lines = { "Target a class/profession trainer, then click." } },
-	}, GEAR_COLOR, -78, nil, "gear")
+	}, box.GEAR_COLOR, -78, nil, "gear")
 
 	local gearRow2 = PlaceRow({
-		{ label = "Sell", key = "", cmd = "SELL", click = CmdSell,
+		{ label = "Sell", key = "", cmd = "SELL", click = box.CmdSell,
 		  title = "Sell greys",
 		  lines = { "Party: s *  Target a vendor first." } },
-		{ label = "Food", key = "", cmd = "FOOD", click = CmdFood,
+		{ label = "Food", key = "", cmd = "FOOD", click = box.CmdFood,
 		  title = "Eat",
 		  lines = { "Party: food." } },
-		{ label = "Home", key = "", cmd = "HOME", click = CmdHome,
+		{ label = "Home", key = "", cmd = "HOME", click = box.CmdHome,
 		  title = "Set hearth",
 		  lines = { "Target an innkeeper, then click. Party: home." } },
-		{ label = "Stats", key = "", cmd = "STATS", click = CmdStats,
+		{ label = "Stats", key = "", cmd = "STATS", click = box.CmdStats,
 		  title = "Stats",
 		  lines = { "Party: stats (gold, bags, durability)." } },
-		{ label = "Drink", key = "", cmd = "PREPDRINK", click = CmdDrink,
+		{ label = "Drink", key = "", cmd = "PREPDRINK", click = box.CmdDrink,
 		  title = "Drink",
 		  lines = { "Party: drink. You drink too." } },
-	}, GEAR_COLOR, gearRow1[1], -4, "gear")
+	}, box.GEAR_COLOR, gearRow1[1], -4, "gear")
 
 	local gearRow3 = PlaceRow({
-		{ label = "Loot", key = "", cmd = "LOOT", click = CmdLoot,
+		{ label = "Loot", key = "", cmd = "LOOT", click = box.CmdLoot,
 		  title = "Loot normal",
 		  lines = { "Party: ll normal (skip BoP)." } },
-		{ label = "Reset", key = "", cmd = "RESETAI", click = CmdResetAI, color = WARN_COLOR,
+		{ label = "Reset", key = "", cmd = "RESETAI", click = box.CmdResetAI, color = box.WARN_COLOR,
 		  title = "Reset bot AI",
 		  lines = { "Party: reset botAI. Use if a bot is stuck." } },
-		{ label = "Leave", key = "", cmd = "LEAVE", click = CmdLeave, color = WARN_COLOR,
+		{ label = "Leave", key = "", cmd = "LEAVE", click = box.CmdLeave, color = box.WARN_COLOR,
 		  title = "Leave party",
 		  lines = { "Click twice to confirm. Never on a combat key." } },
-	}, WARN_COLOR, gearRow2[1], -4, "gear")
+	}, box.WARN_COLOR, gearRow2[1], -4, "gear")
 
 	local stratRow1 = PlaceRow({
-		ClickChip("+Boost", "co +boost", "SBOOST"),
-		ClickChip("-Boost", "co -boost", "SUNBOOST"),
-		ClickChip("+AoE", "co +aoe", "SAOE"),
-		ClickChip("-AoE", "co -aoe", "SUNAOE"),
-		ClickChip("Assist", "co +assist", "SASSIST"),
+		box.ClickChip("+Boost", "co +boost", "SBOOST"),
+		box.ClickChip("-Boost", "co -boost", "SUNBOOST"),
+		box.ClickChip("+AoE", "co +aoe", "SAOE"),
+		box.ClickChip("-AoE", "co -aoe", "SUNAOE"),
+		box.ClickChip("Assist", "co +assist", "SASSIST"),
 	}, STRAT_COLOR, -78, nil, "click")
 
 	local stratRow2 = PlaceRow({
-		ClickChip("Threat", "co +threat", "STHREAT"),
-		ClickChip("CC", "co +cc", "SCC"),
-		ClickChip("Avoid", "co +avoid aoe", "SAVOID"),
-		ClickChip("Loot", "nc +loot", "SLOOT"),
-		ClickChip("co?", "co ?", "SCOQ"),
+		box.ClickChip("Threat", "co +threat", "STHREAT"),
+		box.ClickChip("CC", "co +cc", "SCC"),
+		box.ClickChip("Avoid", "co +avoid aoe", "SAVOID"),
+		box.ClickChip("Loot", "nc +loot", "SLOOT"),
+		box.ClickChip("co?", "co ?", "SCOQ"),
 	}, STRAT_COLOR, stratRow1[1], -4, "click")
 
 	local stratRow3 = PlaceRow({
-		ClickChip("nc?", "nc ?", "SNCQ"),
+		box.ClickChip("nc?", "nc ?", "SNCQ"),
 	}, STRAT_COLOR, stratRow2[1], -4, "click")
 
 	local orderRow1 = PlaceRow({
-		ClickChip("Release", "release", "OREL"),
-		ClickChip("Revive", "revive", "OREV"),
-		ClickChip("Leader", "give leader", "OLEADER"),
-		ClickChip("Disp", "disperse disable", "ODISP"),
+		box.ClickChip("Release", "release", "OREL"),
+		box.ClickChip("Revive", "revive", "OREV"),
+		box.ClickChip("Leader", "give leader", "OLEADER"),
+		box.ClickChip("Disp", "disperse disable", "ODISP"),
 	}, ORDER_COLOR, -78, nil, "click")
 
 	local orderRow2 = PlaceRow({
-		ClickChip("Gray", "ll gray", "OGRAY"),
-		ClickChip("LQuest", "ll quest", "OQUEST"),
-		ClickChip("Skill", "ll skill", "OSKILL"),
-		ClickChip("All", "ll all", "OALL"),
+		box.ClickChip("Gray", "ll gray", "OGRAY"),
+		box.ClickChip("LQuest", "ll quest", "OQUEST"),
+		box.ClickChip("Skill", "ll skill", "OSKILL"),
+		box.ClickChip("All", "ll all", "OALL"),
 	}, ORDER_COLOR, orderRow1[1], -4, "click")
 
 	local orderRow3 = PlaceRow({
-		ClickChip("Open", "open items", "OOPEN"),
-		ClickChip("Vendor", "s vendor", "SVENDOR", { "Needs a vendor (not a player).", "Party chat. Click only." }, CmdVendorOrder),
-		ClickChip("Reset", "reset", "OSTUCK", {
+		box.ClickChip("Open", "open items", "OOPEN"),
+		box.ClickChip("Vendor", "s vendor", "SVENDOR", { "Needs a vendor (not a player).", "Party chat. Click only." }, box.CmdVendorOrder),
+		box.ClickChip("Reset", "reset", "OSTUCK", {
 			"Stuck-cast order. Not reset botAI.",
 			"Not /bot reset (that moves the bar).",
 			"Party chat. Click only.",
-		}, CmdStuckReset),
+		}, box.CmdStuckReset),
 	}, ORDER_COLOR, orderRow2[1], -4, "click")
 
 	local orderRow4 = PlaceRow({
-		ClickChip("Attack", "pet attack", "PATTACK"),
-		ClickChip("Follow", "pet follow", "PFOLLOW"),
-		ClickChip("Stay", "pet stay", "PSTAY"),
-		ClickChip("Pass", "pet passive", "PPASS"),
-		ClickChip("Def", "pet defensive", "PDEF"),
+		box.ClickChip("Attack", "pet attack", "PATTACK"),
+		box.ClickChip("Follow", "pet follow", "PFOLLOW"),
+		box.ClickChip("Stay", "pet stay", "PSTAY"),
+		box.ClickChip("Pass", "pet passive", "PPASS"),
+		box.ClickChip("Def", "pet defensive", "PDEF"),
 	}, ORDER_COLOR, orderRow3[1], -4, "click")
 
 	local questRow1 = PlaceRow({
-		ClickChip("Accept", "accept *", "QACCEPT", { "Needs a quest giver (not a player).", "Party chat. Click only." }, CmdQuestAccept),
-		ClickChip("Talk", "talk", "QTALK", { "Needs a quest giver (not a player).", "Party chat. Click only." }, CmdQuestTalk),
-		ClickChip("Quests", "quests", "QLOG"),
-		ClickChip("All", "quests all", "QALL"),
+		box.ClickChip("Accept", "accept *", "QACCEPT", { "Needs a quest giver (not a player).", "Party chat. Click only." }, box.CmdQuestAccept),
+		box.ClickChip("Talk", "talk", "QTALK", { "Needs a quest giver (not a player).", "Party chat. Click only." }, box.CmdQuestTalk),
+		box.ClickChip("Quests", "quests", "QLOG"),
+		box.ClickChip("All", "quests all", "QALL"),
 	}, QUEST_COLOR, -78, nil, "click")
 
 	f.combatRows = { partyRow, tankRow, dpsRow }
@@ -2061,7 +2119,7 @@ local function BuildUI()
 	function f:Flash(which)
 		local b = self.chips and self.chips[which]
 		if b then
-			FlashBtn(b)
+			box.FlashBtn(b)
 		end
 	end
 
@@ -2083,8 +2141,8 @@ local function BuildUI()
 		for i = 1, #f.tabBtns do
 			local b = f.tabBtns[i]
 			local on = b.pageId == f.page
-			b.color = on and b.tabColor or UTIL_COLOR
-			PaintChip(b)
+			b.color = on and b.tabColor or box.UTIL_COLOR
+			box.PaintChip(b)
 		end
 	end
 
@@ -2093,18 +2151,18 @@ local function BuildUI()
 			page = "combat"
 		end
 		self.page = page
-		leaveArmedUntil = 0
+		box.leaveArmedUntil = 0
 		ShowRows(self.combatRows, page == "combat")
 		ShowRows(self.gearRows, page == "gear")
 		ShowRows(self.stratRows, page == "strat")
 		ShowRows(self.orderRows, page == "orders")
 		ShowRows(self.questRows, page == "quest")
 		PaintTabs()
-		ApplyModifierLook()
+		box.ApplyModifierLook()
 	end
 
 	function f:RefreshStatus()
-		local extra = lastCmd ~= "" and ("  |cff888888" .. lastCmd .. "|r") or ""
+		local extra = box.lastCmd ~= "" and ("  |cff888888" .. box.lastCmd .. "|r") or ""
 		if self.page ~= "combat" then
 			local names = {
 				gear = "|cffc090ffGear|r",
@@ -2116,7 +2174,7 @@ local function BuildUI()
 			self.status:SetText(name .. "   |cff8888881-5 still fight|r" .. extra)
 			return
 		end
-		local mod = CurrentMod()
+		local mod = box.CurrentMod()
 		local tag
 		if mod == "shift" then
 			tag = "|cff6eb5ffShift  tank|r"
@@ -2127,24 +2185,24 @@ local function BuildUI()
 		else
 			tag = "|cffffd1001-5  party|r"
 		end
-		local marks = MarkStatusText()
+		local marks = box.MarkStatusText()
 		if marks then
 			self.status:SetText(tag .. "  " .. marks .. extra)
 		else
-			self.status:SetText(tag .. "   " .. NextLoopLabel() .. extra)
+			self.status:SetText(tag .. "   " .. box.NextLoopLabel() .. extra)
 		end
 	end
 
 	function f:Refresh()
-		RebuildRoster()
-		local list = rosterCache.all
+		box.RebuildRoster()
+		local list = box.rosterCache.all
 		for i = 1, 4 do
 			local b = self.rosterBtns[i]
 			local rec = list[i]
 			if rec then
 				b.botName = rec.name
 				local tag = rec.role == "tank" and "|cffffd100T|r " or (rec.role == "heal" and "|cff66ff66H|r " or "")
-				b.fs:SetText(tag .. ClassColor(rec.class) .. ShortName(rec.name) .. "|r")
+				b.fs:SetText(tag .. box.ClassColor(rec.class) .. box.ShortName(rec.name) .. "|r")
 				b:Show()
 			else
 				b.botName = nil
@@ -2154,32 +2212,32 @@ local function BuildUI()
 		end
 
 		if self.binds and self.binds.labelFs then
-			self.binds.labelFs:SetText(db.useBinds and "Bound" or "Binds")
-			self.binds.color = db.useBinds and LOOP_COLOR or UTIL_COLOR
+			self.binds.labelFs:SetText(box.db.useBinds and "Bound" or "Binds")
+			self.binds.color = box.db.useBinds and box.LOOP_COLOR or box.UTIL_COLOR
 		end
 		if self.setup and self.setup.labelFs then
-			self.setup.labelFs:SetText(setupDone and "Set" or "Setup")
-			self.setup.color = setupDone and LOOP_COLOR or UTIL_COLOR
+			self.setup.labelFs:SetText(box.setupDone and "Set" or "Setup")
+			self.setup.color = box.setupDone and box.LOOP_COLOR or box.UTIL_COLOR
 		end
 		if self.tabBtns then
 			for i = 1, #self.tabBtns do
 				local b = self.tabBtns[i]
 				local on = b.pageId == self.page
-				b.color = on and b.tabColor or UTIL_COLOR
-				PaintChip(b)
+				b.color = on and b.tabColor or box.UTIL_COLOR
+				box.PaintChip(b)
 			end
 		end
 		if self.chips and self.chips.MARK and self.chips.MARK.labelFs then
-			local on = db.markEnabled
+			local on = box.db.markEnabled
 			self.chips.MARK.labelFs:SetText(on and "ON" or "Mark")
-			self.chips.MARK.color = on and LOOP_COLOR or UTIL_COLOR
+			self.chips.MARK.color = on and box.LOOP_COLOR or box.UTIL_COLOR
 		end
-		ApplyModifierLook()
+		box.ApplyModifierLook()
 	end
 
-	ui = f
+	box.ui = f
 	f:SetPage("combat")
-	if db.shown then
+	if box.db.shown then
 		f:Show()
 	else
 		f:Hide()
@@ -2214,11 +2272,11 @@ driver:SetScript("OnEvent", function(self, event, ...)
 		local name = ...
 		if name ~= ADDON then return end
 		BotCtrlDB = CopyDefaults(defaults, BotCtrlDB)
-		db = BotCtrlDB
+		box.db = BotCtrlDB
 	elseif event == "PLAYER_LOGIN" then
-		if not db then
+		if not box.db then
 			BotCtrlDB = CopyDefaults(defaults, BotCtrlDB)
-			db = BotCtrlDB
+			box.db = BotCtrlDB
 		end
 		BuildUI()
 		ApplyBinds()
@@ -2228,32 +2286,32 @@ driver:SetScript("OnEvent", function(self, event, ...)
 		if inInstance and (itype == "party" or itype == "raid") then
 			WipeOrInstanceReset()
 			Print("Instance: Summon -> Follow. Click Loop or key 3.")
-			if ui and ui.Refresh then ui:Refresh() end
+			if box.ui and box.ui.Refresh then box.ui:Refresh() end
 		end
 		RebuildRoster()
-		if ui and ui.Refresh then ui:Refresh() end
+		if box.ui and box.ui.Refresh then box.ui:Refresh() end
 	elseif event == "PARTY_MEMBERS_CHANGED" or event == "RAID_ROSTER_UPDATE" then
-		setupDone = false
+		box.setupDone = false
 		RebuildRoster()
-		if ui and ui.Refresh then ui:Refresh() end
+		if box.ui and box.ui.Refresh then box.ui:Refresh() end
 	elseif event == "PLAYER_REGEN_ENABLED" then
 		if bindsPending then
 			ApplyBinds()
 		end
 		WipePack()
-		if ui and ui.Refresh then ui:Refresh() end
+		if box.ui and box.ui.Refresh then box.ui:Refresh() end
 	elseif event == "PLAYER_REGEN_DISABLED" then
 		-- keep current pack marks into the pull
 	elseif event == "PLAYER_DEAD" then
 		WipeOrInstanceReset()
-		if ui and ui.Refresh then ui:Refresh() end
+		if box.ui and box.ui.Refresh then box.ui:Refresh() end
 	elseif event == "PLAYER_TARGET_CHANGED" then
 		ApplyModifierLook()
-		if db and db.markEnabled then ApplyVisible() end
+		if box.db and box.db.markEnabled then ApplyVisible() end
 	elseif event == "UPDATE_MOUSEOVER_UNIT"
 		or event == "PLAYER_FOCUS_CHANGED"
 		or event == "UNIT_TARGET" then
-		if db and db.markEnabled then ApplyVisible() end
+		if box.db and box.db.markEnabled then ApplyVisible() end
 	elseif event == "MODIFIER_STATE_CHANGED" then
 		ApplyModifierLook()
 	elseif event == "UNIT_AURA" or event == "UNIT_INVENTORY_CHANGED" then
@@ -2280,8 +2338,8 @@ driver:SetScript("OnUpdate", function(self, dt)
 		if rosterElapsed >= 0.25 then
 			rosterDirty = false
 			rosterElapsed = 0
-			if ui and ui.Refresh then
-				ui:Refresh()
+			if box.ui and box.ui.Refresh then
+				box.ui:Refresh()
 			else
 				RebuildRoster()
 			end
@@ -2289,7 +2347,7 @@ driver:SetScript("OnUpdate", function(self, dt)
 	else
 		rosterElapsed = 0
 	end
-	if db and db.markEnabled then
+	if box.db and box.db.markEnabled then
 		markElapsed = markElapsed + dt
 		if markElapsed >= 0.15 then
 			markElapsed = 0
@@ -2355,55 +2413,55 @@ SlashCmdList["BOTCTRL"] = function(msg)
 			Print(name .. " -> heal")
 		end
 	elseif cmd == "binds" then
-		if not db.useBinds then
+		if not box.db.useBinds then
 			ToggleBinds()
 		else
 			Print("Already bound. /bot unbind to release.")
 		end
 	elseif cmd == "unbind" then
-		if db.useBinds then
+		if box.db.useBinds then
 			ToggleBinds()
 		else
 			Print("Binds already off.")
 		end
 	elseif cmd == "show" then
-		db.shown = true
-		if ui then ui:Show() end
+		box.db.shown = true
+		if box.ui then box.ui:Show() end
 	elseif cmd == "hide" then
-		db.shown = false
-		if ui then ui:Hide() end
+		box.db.shown = false
+		if box.ui then box.ui:Hide() end
 	elseif cmd == "toggle" then
-		db.shown = not db.shown
-		if ui then
-			if db.shown then ui:Show() else ui:Hide() end
+		box.db.shown = not box.db.shown
+		if box.ui then
+			if box.db.shown then box.ui:Show() else box.ui:Hide() end
 		end
 	elseif cmd == "lock" then
-		db.locked = not db.locked
-		Print(db.locked and "Bar locked." or "Bar unlocked — drag to move.")
-		if ui and ui.lock and ui.lock.tex then
-			if db.locked then
-				ui.lock.tex:SetTexture("Interface\\Buttons\\LockButton-Locked-Up")
+		box.db.locked = not box.db.locked
+		Print(box.db.locked and "Bar locked." or "Bar unlocked — drag to move.")
+		if box.ui and box.ui.lock and box.ui.lock.tex then
+			if box.db.locked then
+				box.ui.lock.tex:SetTexture("Interface\\Buttons\\LockButton-Locked-Up")
 			else
-				ui.lock.tex:SetTexture("Interface\\Buttons\\LockButton-Unlocked-Up")
+				box.ui.lock.tex:SetTexture("Interface\\Buttons\\LockButton-Unlocked-Up")
 			end
 		end
 	elseif cmd == "reset" then
-		db.point, db.relPoint, db.x, db.y = "CENTER", "CENTER", 0, -260
-		if ui then
-			ui:ClearAllPoints()
-			ui:SetPoint("CENTER", UIParent, "CENTER", 0, -260)
+		box.db.point, box.db.relPoint, box.db.x, box.db.y = "CENTER", "CENTER", 0, -260
+		if box.ui then
+			box.ui:ClearAllPoints()
+			box.ui:SetPoint("CENTER", UIParent, "CENTER", 0, -260)
 		end
 		Print("Bar position reset.")
 	elseif cmd == "gear" or cmd == "prep" then
-		if ui and ui.SetPage then ui:SetPage("gear") end
+		if box.ui and box.ui.SetPage then box.ui:SetPage("gear") end
 	elseif cmd == "fight" or cmd == "combat" then
-		if ui and ui.SetPage then ui:SetPage("combat") end
+		if box.ui and box.ui.SetPage then box.ui:SetPage("combat") end
 	elseif cmd == "strat" then
-		if ui and ui.SetPage then ui:SetPage("strat") end
+		if box.ui and box.ui.SetPage then box.ui:SetPage("strat") end
 	elseif cmd == "orders" then
-		if ui and ui.SetPage then ui:SetPage("orders") end
+		if box.ui and box.ui.SetPage then box.ui:SetPage("orders") end
 	elseif cmd == "quest" then
-		if ui and ui.SetPage then ui:SetPage("quest") end
+		if box.ui and box.ui.SetPage then box.ui:SetPage("quest") end
 	elseif cmd == "maint" then
 		CmdMaint()
 	elseif cmd == "train" then
@@ -2413,9 +2471,9 @@ SlashCmdList["BOTCTRL"] = function(msg)
 	elseif cmd == "resetai" then
 		CmdResetAI()
 	elseif cmd == "melee" then
-		db.markMelee = not db.markMelee
-		Print(db.markMelee and "Marking casters AND melee." or "Casters / mana users only.")
-		if db.markEnabled then ApplyVisible() end
+		box.db.markMelee = not box.db.markMelee
+		Print(box.db.markMelee and "Marking casters AND melee." or "Casters / mana users only.")
+		if box.db.markEnabled then ApplyVisible() end
 	else
 		Print("unknown: " .. cmd .. "  —  /bot help")
 	end
