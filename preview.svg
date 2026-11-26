@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="2560" height="1960" viewBox="0 0 1280 980" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="2560" height="2080" viewBox="0 0 1280 1040" role="img" aria-labelledby="title desc">
   <title id="title">BotCtrl interface</title>
-  <desc id="desc">Annotated Fight and Gear pages for the BotCtrl WotLK playerbot commander.</desc>
+  <desc id="desc">Annotated Fight and Orders tabs for the BotCtrl WotLK playerbot commander. A tab row switches Fight, Gear, Strat, Orders, and Quest. 1-5 always fight.</desc>
   <defs>
     <filter id="shadow" x="-8%" y="-8%" width="116%" height="116%">
       <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#000" flood-opacity="0.55"/>
@@ -24,195 +24,203 @@
       .line { stroke: #c9a227; stroke-width: 1.3; fill: none; }
       .hdr { fill: #ececec; font: 700 22px "Trebuchet MS", "Segoe UI", sans-serif; }
       .tag { fill: #888; font: 500 12px "Segoe UI", sans-serif; }
+      .tab { fill: #f3f3f3; font: 600 11px "Trebuchet MS", "Segoe UI", sans-serif; text-anchor: middle; }
     </style>
-    <!-- one chip body; fill comes from the <use> -->
     <rect id="c" class="chip" width="58" height="22" rx="2"/>
-    <!-- padlock, matches Interface\Buttons\LockButton-Unlocked-Up -->
     <g id="lock">
       <rect x="1" y="7" width="12" height="9" rx="1.5" fill="#aaa"/>
       <path d="M3.5 7V4.5a3.5 3.5 0 0 1 7 0V6" fill="none" stroke="#aaa" stroke-width="1.6"/>
     </g>
-    <!-- shared header: skull, title, Binds, Setup, lock. First chip differs per page. -->
+    <!-- header: skull, title, Binds, Setup, lock. Tabs are drawn per panel. -->
     <g id="frame">
       <circle cx="22" cy="20" r="8" fill="#1a1a1a" stroke="#ddd" stroke-width="1.2"/>
       <path d="M18 18h8M20 23h4" stroke="#eee" stroke-width="1.1"/>
       <text class="title" x="36" y="25">BotCtrl</text>
-      <rect class="chip" x="169" y="8" width="48" height="22" rx="2" fill="#2e2e33"/>
-      <text class="lbl" x="193" y="23">Binds</text>
-      <rect class="chip" x="220" y="8" width="48" height="22" rx="2" fill="#2e2e33"/>
-      <text class="lbl" x="244" y="23">Setup</text>
-      <use href="#lock" x="280" y="4"/>
+      <rect class="chip" x="195" y="8" width="48" height="22" rx="2" fill="#2e2e33"/>
+      <text class="lbl" x="219" y="23">Binds</text>
+      <rect class="chip" x="246" y="8" width="48" height="22" rx="2" fill="#2e2e33"/>
+      <text class="lbl" x="270" y="23">Setup</text>
+      <use href="#lock" x="298" y="4"/>
     </g>
-    <!-- roster: role tag yellow, names class colored -->
     <g id="roster" class="roster">
-      <text x="12" y="48"><tspan fill="#ffd100">T</tspan> <tspan fill="#f58cba">Gerolain</tspan></text>
-      <text x="96" y="48" fill="#c69b6d">Odris</text>
-      <text x="150" y="48" fill="#69ccf0">Marlesh</text>
-      <text x="216" y="48" fill="#fff569">Lelarena</text>
+      <text x="12" y="70"><tspan fill="#ffd100">T</tspan> <tspan fill="#f58cba">Gerolain</tspan></text>
+      <text x="96" y="70" fill="#c69b6d">Odris</text>
+      <text x="150" y="70" fill="#69ccf0">Marlesh</text>
+      <text x="216" y="70" fill="#fff569">Lelarena</text>
     </g>
   </defs>
-  <rect class="bg" width="1280" height="980"/>
-  <text class="hdr" x="40" y="42">BotCtrl</text>
-  <text class="tag" x="140" y="42">WotLK 3.3.5a playerbot commander: click a chip or use 1-5 / Shift / Ctrl</text>
+  <rect class="bg" width="1280" height="1040"/>
+  <text class="hdr" x="40" y="36">BotCtrl</text>
+  <text class="tag" x="150" y="36">Five tabs. 1-5 / Shift / Ctrl always fight. New tabs are click only.</text>
 
-  <!-- FIGHT PANEL -->
-  <g filter="url(#shadow)" transform="translate(330,70)">
-    <rect class="panel" rx="6" ry="6" width="322" height="168"/>
+  <text class="sub" x="330" y="58">Fight tab (default)</text>
+  <g filter="url(#shadow)" transform="translate(330,66)">
+    <rect class="panel" rx="6" ry="6" width="322" height="220"/>
     <use href="#frame"/>
-    <rect class="chip" x="118" y="8" width="48" height="22" rx="2" fill="#2e2e33"/>
-    <text class="lbl" x="142" y="23">Gear</text>
+    <rect class="chip" x="8" y="32" width="58" height="22" rx="2" fill="#6b4d12"/>
+    <text class="tab" x="37" y="47">Fight</text>
+    <rect class="chip" x="70" y="32" width="58" height="22" rx="2" fill="#2e2e33"/>
+    <text class="tab" x="99" y="47">Gear</text>
+    <rect class="chip" x="132" y="32" width="58" height="22" rx="2" fill="#2e2e33"/>
+    <text class="tab" x="161" y="47">Strat</text>
+    <rect class="chip" x="194" y="32" width="58" height="22" rx="2" fill="#2e2e33"/>
+    <text class="tab" x="223" y="47">Orders</text>
+    <rect class="chip" x="256" y="32" width="58" height="22" rx="2" fill="#2e2e33"/>
+    <text class="tab" x="285" y="47">Quest</text>
     <use href="#roster"/>
 
-    <!-- party gold -->
-    <g transform="translate(8,58)"><use href="#c" fill="#6b4d12"/><text class="key" x="4" y="8">1</text><text class="lblk" x="29" y="19">Follow</text></g>
-    <g transform="translate(70,58)"><use href="#c" fill="#6b4d12"/><text class="key" x="4" y="8">2</text><text class="lblk" x="29" y="19">Stay</text></g>
-    <g transform="translate(132,58)"><use href="#c" fill="#6b4d12"/><text class="key" x="4" y="8">3</text><text class="lblk" x="29" y="19">Summon</text></g>
-    <g transform="translate(194,58)"><use href="#c" fill="#6b4d12"/><text class="key" x="4" y="8">4</text><text class="lblk" x="29" y="19">Drink</text></g>
-    <g transform="translate(256,58)"><use href="#c" fill="#6b4d12"/><text class="key" x="4" y="8">5</text><text class="lblk" x="29" y="19">Flee</text></g>
+    <g transform="translate(8,82)"><use href="#c" fill="#6b4d12"/><text class="key" x="4" y="8">1</text><text class="lblk" x="29" y="19">Follow</text></g>
+    <g transform="translate(70,82)"><use href="#c" fill="#6b4d12"/><text class="key" x="4" y="8">2</text><text class="lblk" x="29" y="19">Stay</text></g>
+    <g transform="translate(132,82)"><use href="#c" fill="#6b4d12"/><text class="key" x="4" y="8">3</text><text class="lblk" x="29" y="19">Summon</text></g>
+    <g transform="translate(194,82)"><use href="#c" fill="#6b4d12"/><text class="key" x="4" y="8">4</text><text class="lblk" x="29" y="19">Drink</text></g>
+    <g transform="translate(256,82)"><use href="#c" fill="#6b4d12"/><text class="key" x="4" y="8">5</text><text class="lblk" x="29" y="19">Flee</text></g>
 
-    <!-- tank blue + mark -->
-    <g transform="translate(8,84)"><use href="#c" fill="#1a477a"/><text class="key" x="4" y="8">S1</text><text class="lblk" x="29" y="19">Hold</text></g>
-    <g transform="translate(70,84)"><use href="#c" fill="#1a477a"/><text class="key" x="4" y="8">S2</text><text class="lblk" x="29" y="19">Pull</text></g>
-    <g transform="translate(132,84)"><use href="#c" fill="#1a477a"/><text class="key" x="4" y="8">S3</text><text class="lblk" x="29" y="19">Go</text></g>
-    <g transform="translate(194,84)"><use href="#c" fill="#2e2e33"/><text class="lbl" x="29" y="15">Mark</text></g>
-    <g transform="translate(256,84)"><use href="#c" fill="#2e2e33"/><text class="lbl" x="29" y="15">Clear</text></g>
+    <g transform="translate(8,108)"><use href="#c" fill="#1a477a"/><text class="key" x="4" y="8">S1</text><text class="lblk" x="29" y="19">Hold</text></g>
+    <g transform="translate(70,108)"><use href="#c" fill="#1a477a"/><text class="key" x="4" y="8">S2</text><text class="lblk" x="29" y="19">Pull</text></g>
+    <g transform="translate(132,108)"><use href="#c" fill="#1a477a"/><text class="key" x="4" y="8">S3</text><text class="lblk" x="29" y="19">Go</text></g>
+    <g transform="translate(194,108)"><use href="#c" fill="#2e2e33"/><text class="lbl" x="29" y="15">Mark</text></g>
+    <g transform="translate(256,108)"><use href="#c" fill="#2e2e33"/><text class="lbl" x="29" y="15">Clear</text></g>
 
-    <!-- dps red -->
-    <g transform="translate(8,110)"><use href="#c" fill="#7a1f1f"/><text class="key" x="4" y="8">C1</text><text class="lblk" x="29" y="19">Kill</text></g>
-    <g transform="translate(70,110)"><use href="#c" fill="#7a1f1f"/><text class="key" x="4" y="8">C2</text><text class="lblk" x="29" y="19">Burn</text></g>
-    <g transform="translate(132,110)"><use href="#c" fill="#7a1f1f"/><text class="key" x="4" y="8">C3</text><text class="lblk" x="29" y="19">Skull</text></g>
-    <g transform="translate(194,110)"><use href="#c" fill="#7a1f1f"/><text class="key" x="4" y="8">C4</text><text class="lblk" x="29" y="19">Water</text></g>
-    <g transform="translate(256,110)"><use href="#c" fill="#24612e"/><text class="key" x="4" y="8">C5</text><text class="lblk" x="29" y="19">Loop</text></g>
+    <g transform="translate(8,134)"><use href="#c" fill="#7a1f1f"/><text class="key" x="4" y="8">C1</text><text class="lblk" x="29" y="19">Kill</text></g>
+    <g transform="translate(70,134)"><use href="#c" fill="#7a1f1f"/><text class="key" x="4" y="8">C2</text><text class="lblk" x="29" y="19">Burn</text></g>
+    <g transform="translate(132,134)"><use href="#c" fill="#7a1f1f"/><text class="key" x="4" y="8">C3</text><text class="lblk" x="29" y="19">Skull</text></g>
+    <g transform="translate(194,134)"><use href="#c" fill="#7a1f1f"/><text class="key" x="4" y="8">C4</text><text class="lblk" x="29" y="19">Water</text></g>
+    <g transform="translate(256,134)"><use href="#c" fill="#24612e"/><text class="key" x="4" y="8">C5</text><text class="lblk" x="29" y="19">Loop</text></g>
 
-    <text class="status" x="12" y="152">1-5 party    Next: Follow</text>
+    <text class="status" x="12" y="206">1-5 party    Next: Follow</text>
   </g>
-  <text class="sub" x="330" y="64">Fight page</text>
 
-  <!-- FIGHT CALLOUTS LEFT (circles sit on the heading row so notes never cross them) -->
   <g>
-    <path class="line" d="M318,89 L208,74"/>
+    <path class="line" d="M318,86 L208,74"/>
     <circle class="call" cx="198" cy="74" r="10"/>
     <text class="n" x="198" y="78">1</text>
     <text class="note-strong" x="40" y="78">Header</text>
-    <text class="note" x="40" y="96">Gear / Binds / Setup / lock</text>
-    <text class="note" x="40" y="112">Gear swaps this pad for prep.</text>
-    <text class="note" x="40" y="128">Binds overlays 1-5 (not permanent).</text>
-    <text class="note" x="40" y="144">Setup whispers tank + DPS roles.</text>
+    <text class="note" x="40" y="96">Binds / Setup / lock</text>
+    <text class="note" x="40" y="112">Setup whispers roles once.</text>
+    <text class="note" x="40" y="128">No Gear/Fight toggle.</text>
 
-    <path class="line" d="M318,114 L208,164"/>
+    <path class="line" d="M318,112 L208,164"/>
     <circle class="call" cx="198" cy="164" r="10"/>
     <text class="n" x="198" y="168">2</text>
-    <text class="note-strong" x="40" y="168">Roster</text>
-    <text class="note" x="40" y="186">Left-click locks tank.</text>
-    <text class="note" x="40" y="202">Right-click healer / DPS.</text>
-    <text class="note" x="40" y="218">Prot pala beats fury warrior.</text>
+    <text class="note-strong" x="40" y="168">Tabs</text>
+    <text class="note" x="40" y="186">Fight Gear Strat Orders Quest</text>
+    <text class="note" x="40" y="202">Roster stays under the tabs.</text>
+    <text class="note" x="40" y="218">1-5 still fight on every tab.</text>
   </g>
 
-  <!-- FIGHT CALLOUTS RIGHT -->
   <g>
-    <path class="line" d="M662,139 L762,74"/>
+    <path class="line" d="M662,160 L762,74"/>
     <circle class="call" cx="772" cy="74" r="10"/>
     <text class="n" x="772" y="78">3</text>
     <text class="note-strong" x="790" y="78">Party: keys 1-5</text>
     <text class="note" x="790" y="96">Follow, Stay, Summon, Drink, Flee</text>
-    <text class="note" x="790" y="112">All bots. Gold row while no modifier.</text>
+    <text class="note" x="790" y="112">Gold while no modifier is held.</text>
 
-    <path class="line" d="M662,165 L762,152"/>
-    <circle class="call" cx="772" cy="152" r="10"/>
-    <text class="n" x="772" y="156">4</text>
-    <text class="note-strong" x="790" y="156">Tank: Shift-1/2/3</text>
-    <text class="note" x="790" y="174">Hold = follow then stay (tank only)</text>
-    <text class="note" x="790" y="190">Pull / Go start the fight</text>
-    <text class="note" x="790" y="206">Mark / Clear = icons only, no attack</text>
+    <path class="line" d="M662,186 L762,148"/>
+    <circle class="call" cx="772" cy="148" r="10"/>
+    <text class="n" x="772" y="152">4</text>
+    <text class="note-strong" x="790" y="152">Tank: Shift-1/2/3</text>
+    <text class="note" x="790" y="170">Hold, Pull, Go</text>
+    <text class="note" x="790" y="186">Mark / Clear stay on this row</text>
 
-    <path class="line" d="M662,191 L762,236"/>
-    <circle class="call" cx="772" cy="236" r="10"/>
-    <text class="n" x="772" y="240">5</text>
-    <text class="note-strong" x="790" y="240">DPS: Ctrl-1 to 5</text>
-    <text class="note" x="790" y="258">Kill / Burn / Skull / Water / Loop</text>
-    <text class="note" x="790" y="274">Skull = rti skull + attack (combat)</text>
-    <text class="note" x="790" y="290">Hold Ctrl to arm this row</text>
+    <path class="line" d="M662,212 L762,222"/>
+    <circle class="call" cx="772" cy="222" r="10"/>
+    <text class="n" x="772" y="226">5</text>
+    <text class="note-strong" x="790" y="226">DPS: Ctrl-1 to 5</text>
+    <text class="note" x="790" y="244">Kill / Burn / Skull / Water / Loop</text>
+    <text class="note" x="790" y="260">These keys never change with the tab.</text>
   </g>
 
-  <!-- GEAR PANEL -->
-  <text class="sub" x="330" y="430">Gear page  (header Gear becomes Fight)</text>
-  <g filter="url(#shadow)" transform="translate(330,440)">
-    <rect class="panel" rx="6" ry="6" width="322" height="168"/>
+  <text class="sub" x="330" y="348">Orders tab  (same height; status does not jump)</text>
+  <g filter="url(#shadow)" transform="translate(330,356)">
+    <rect class="panel" rx="6" ry="6" width="322" height="220"/>
     <use href="#frame"/>
-    <rect class="chip" x="118" y="8" width="48" height="22" rx="2" fill="#6b4d12"/>
-    <text class="lbl" x="142" y="23">Fight</text>
+    <rect class="chip" x="8" y="32" width="58" height="22" rx="2" fill="#2e2e33"/>
+    <text class="tab" x="37" y="47">Fight</text>
+    <rect class="chip" x="70" y="32" width="58" height="22" rx="2" fill="#2e2e33"/>
+    <text class="tab" x="99" y="47">Gear</text>
+    <rect class="chip" x="132" y="32" width="58" height="22" rx="2" fill="#2e2e33"/>
+    <text class="tab" x="161" y="47">Strat</text>
+    <rect class="chip" x="194" y="32" width="58" height="22" rx="2" fill="#57421a"/>
+    <text class="tab" x="223" y="47">Orders</text>
+    <rect class="chip" x="256" y="32" width="58" height="22" rx="2" fill="#2e2e33"/>
+    <text class="tab" x="285" y="47">Quest</text>
     <use href="#roster"/>
 
-    <g transform="translate(8,58)"><use href="#c" fill="#52296b"/><text class="lbl" x="29" y="15">Gear</text></g>
-    <g transform="translate(70,58)"><use href="#c" fill="#52296b"/><text class="lbl" x="29" y="15">Maint</text></g>
-    <g transform="translate(132,58)"><use href="#c" fill="#52296b"/><text class="lbl" x="29" y="15">Repair</text></g>
-    <g transform="translate(194,58)"><use href="#c" fill="#52296b"/><text class="lbl" x="29" y="15">Talent</text></g>
-    <g transform="translate(256,58)"><use href="#c" fill="#52296b"/><text class="lbl" x="29" y="15">Train</text></g>
+    <g transform="translate(8,82)"><use href="#c" fill="#57421a"/><text class="lbl" x="29" y="15">Release</text></g>
+    <g transform="translate(70,82)"><use href="#c" fill="#57421a"/><text class="lbl" x="29" y="15">Revive</text></g>
+    <g transform="translate(132,82)"><use href="#c" fill="#57421a"/><text class="lbl" x="29" y="15">Leader</text></g>
+    <g transform="translate(194,82)"><use href="#c" fill="#57421a"/><text class="lbl" x="29" y="15">Disp</text></g>
 
-    <g transform="translate(8,84)"><use href="#c" fill="#52296b"/><text class="lbl" x="29" y="15">Sell</text></g>
-    <g transform="translate(70,84)"><use href="#c" fill="#52296b"/><text class="lbl" x="29" y="15">Food</text></g>
-    <g transform="translate(132,84)"><use href="#c" fill="#52296b"/><text class="lbl" x="29" y="15">Home</text></g>
-    <g transform="translate(194,84)"><use href="#c" fill="#52296b"/><text class="lbl" x="29" y="15">Stats</text></g>
-    <g transform="translate(256,84)"><use href="#c" fill="#52296b"/><text class="lbl" x="29" y="15">Drink</text></g>
+    <g transform="translate(8,108)"><use href="#c" fill="#57421a"/><text class="lbl" x="29" y="15">Gray</text></g>
+    <g transform="translate(70,108)"><use href="#c" fill="#57421a"/><text class="lbl" x="29" y="15">LQuest</text></g>
+    <g transform="translate(132,108)"><use href="#c" fill="#57421a"/><text class="lbl" x="29" y="15">Skill</text></g>
+    <g transform="translate(194,108)"><use href="#c" fill="#57421a"/><text class="lbl" x="29" y="15">All</text></g>
 
-    <g transform="translate(8,110)"><use href="#c" fill="#7a3814"/><text class="lbl" x="29" y="15">Loot</text></g>
-    <g transform="translate(70,110)"><use href="#c" fill="#7a3814"/><text class="lbl" x="29" y="15">Reset</text></g>
-    <g transform="translate(132,110)"><use href="#c" fill="#7a3814"/><text class="lbl" x="29" y="15">Leave</text></g>
+    <g transform="translate(8,134)"><use href="#c" fill="#57421a"/><text class="lbl" x="29" y="15">Open</text></g>
+    <g transform="translate(70,134)"><use href="#c" fill="#57421a"/><text class="lbl" x="29" y="15">Vendor</text></g>
+    <g transform="translate(132,134)"><use href="#c" fill="#57421a"/><text class="lbl" x="29" y="15">Reset</text></g>
 
-    <text class="status" x="12" y="152" font-size="10.5">Gear page  autogear / repair / talents  (1-5 still combat)</text>
+    <g transform="translate(8,160)"><use href="#c" fill="#57421a"/><text class="lbl" x="29" y="15">Attack</text></g>
+    <g transform="translate(70,160)"><use href="#c" fill="#57421a"/><text class="lbl" x="29" y="15">Follow</text></g>
+    <g transform="translate(132,160)"><use href="#c" fill="#57421a"/><text class="lbl" x="29" y="15">Stay</text></g>
+    <g transform="translate(194,160)"><use href="#c" fill="#57421a"/><text class="lbl" x="29" y="15">Pass</text></g>
+    <g transform="translate(256,160)"><use href="#c" fill="#57421a"/><text class="lbl" x="29" y="15">Def</text></g>
+
+    <text class="status" x="12" y="206">Orders   1-5 still fight</text>
   </g>
 
-  <!-- GEAR CALLOUTS -->
   <g>
-    <path class="line" d="M318,459 L208,484"/>
-    <circle class="call" cx="198" cy="484" r="10"/>
-    <text class="n" x="198" y="488">6</text>
-    <text class="note-strong" x="40" y="488">Fight</text>
-    <text class="note" x="40" y="506">Same header chip, returns</text>
-    <text class="note" x="40" y="522">to the combat pad.</text>
-    <text class="note" x="40" y="538">1-5 still fire combat.</text>
+    <path class="line" d="M318,450 L208,470"/>
+    <circle class="call" cx="198" cy="470" r="10"/>
+    <text class="n" x="198" y="474">6</text>
+    <text class="note-strong" x="40" y="474">Orders</text>
+    <text class="note" x="40" y="492">release, revive, give leader</text>
+    <text class="note" x="40" y="508">disperse disable</text>
+    <text class="note" x="40" y="524">ll gray / quest / skill / all</text>
+    <text class="note" x="40" y="540">Click only. Not a keybind.</text>
 
-    <path class="line" d="M318,509 L208,568"/>
-    <circle class="call" cx="198" cy="568" r="10"/>
-    <text class="n" x="198" y="572">7</text>
-    <text class="note-strong" x="40" y="572">Prep</text>
-    <text class="note" x="40" y="590">Gear = autogear</text>
-    <text class="note" x="40" y="606">Maint / Repair / Talent / Train</text>
-    <text class="note" x="40" y="622">Train needs a trainer targeted</text>
-
-    <path class="line" d="M662,535 L762,484"/>
-    <circle class="call" cx="772" cy="484" r="10"/>
-    <text class="n" x="772" y="488">8</text>
-    <text class="note-strong" x="790" y="488">Bags &amp; camp</text>
-    <text class="note" x="790" y="506">Sell greys (vendor targeted)</text>
-    <text class="note" x="790" y="522">Food / Home / Stats / Drink</text>
-    <text class="note" x="790" y="538">Home needs an innkeeper</text>
-
-    <path class="line" d="M662,561 L762,568"/>
-    <circle class="call" cx="772" cy="568" r="10"/>
-    <text class="n" x="772" y="572">9</text>
-    <text class="note-strong" x="790" y="572">Danger row</text>
-    <text class="note" x="790" y="590">Loot = ll normal (skip BoP)</text>
-    <text class="note" x="790" y="606">Reset = reset botAI if stuck</text>
-    <text class="note" x="790" y="622">Leave = click twice within 4s to confirm</text>
-    <text class="note" x="790" y="638">Never bound to 1-5</text>
+    <path class="line" d="M318,528 L208,572"/>
+    <circle class="call" cx="198" cy="572" r="10"/>
+    <text class="n" x="198" y="576">7</text>
+    <text class="note-strong" x="40" y="576">Guards</text>
+    <text class="note" x="40" y="594">Vendor needs a non-player.</text>
+    <text class="note" x="40" y="610">Reset sends reset, not botAI.</text>
+    <text class="note" x="40" y="626">/bot reset still moves the bar.</text>
   </g>
 
-  <!-- footer legend -->
-  <rect x="40" y="690" width="1200" height="250" rx="8" fill="#161820" stroke="#3a3420" stroke-width="1"/>
-  <text class="title" x="60" y="718">What each control does</text>
+  <g>
+    <path class="line" d="M662,528 L762,470"/>
+    <circle class="call" cx="772" cy="470" r="10"/>
+    <text class="n" x="772" y="474">8</text>
+    <text class="note-strong" x="790" y="474">Pets</text>
+    <text class="note" x="790" y="492">pet attack / follow / stay</text>
+    <text class="note" x="790" y="508">pet passive / pet defensive</text>
+    <text class="note" x="790" y="524">open items on the row above</text>
 
-  <text class="note-strong" x="60" y="748">1  Header</text>
-  <text class="note" x="160" y="748">Gear page toggle. Binds 1-5 overlay. Setup roles once after invite. Padlock locks the bar.</text>
-  <text class="note-strong" x="60" y="770">2  Roster</text>
-  <text class="note" x="160" y="770">Party names. Left-click = tank. Right-click = healer/DPS. Auto-tank uses RF / shield / stance, not class.</text>
-  <text class="note-strong" x="60" y="792">3  Party</text>
-  <text class="note" x="160" y="792">1 Follow, 2 Stay, 3 Summon, 4 Drink, 5 Flee. All bots. Gold while no modifier is held.</text>
-  <text class="note-strong" x="60" y="814">4  Tank</text>
-  <text class="note" x="160" y="814">Shift-1 Hold (come and stay), Shift-2 Pull, Shift-3 Go. Mark paints skull on casters; does not attack. Clear wipes icons.</text>
-  <text class="note-strong" x="60" y="836">5  DPS</text>
-  <text class="note" x="160" y="836">Ctrl-1 Kill, Ctrl-2 Burn, Ctrl-3 Skull (rti + attack), Ctrl-4 mage water, Ctrl-5 dungeon loop. Combat starts here / Pull / Go.</text>
-  <text class="note-strong" x="60" y="858">6-9  Gear</text>
-  <text class="note" x="160" y="858">Prep only. Autogear, repair, talents, sell, hearth. Leave arms on the first click and needs a second click within 4s. Keys 1-5 still Follow/Stay/Summon here.</text>
-  <text class="muted" x="60" y="890">Hold Shift to arm the tank row, Ctrl to arm DPS. Status line shows the live modifier and the next loop step (or pack marks when Mark is ON).</text>
+    <path class="line" d="M662,400 L762,572"/>
+    <circle class="call" cx="772" cy="572" r="10"/>
+    <text class="n" x="772" y="576">9</text>
+    <text class="note-strong" x="790" y="576">Other tabs</text>
+    <text class="note" x="790" y="594">Gear: autogear, repair, talents</text>
+    <text class="note" x="790" y="610">Leave is still two clicks</text>
+    <text class="note" x="790" y="626">Strat: co +boost / +aoe / +cc ...</text>
+    <text class="note" x="790" y="642">Quest: accept * / talk / quests</text>
+  </g>
+
+  <rect x="40" y="760" width="1200" height="250" rx="8" fill="#161820" stroke="#3a3420" stroke-width="1"/>
+  <text class="title" x="60" y="788">What each control does</text>
+  <text class="note-strong" x="60" y="816">1  Header</text>
+  <text class="note" x="160" y="816">Binds overlays 1-5. Setup whispers tank and DPS roles once. Padlock locks the bar.</text>
+  <text class="note-strong" x="60" y="838">2  Tabs</text>
+  <text class="note" x="160" y="838">Fight, Gear, Strat, Orders, Quest. Not a header Gear/Fight toggle. Roster stays visible.</text>
+  <text class="note-strong" x="60" y="860">3-5  Fight</text>
+  <text class="note" x="160" y="860">1-5 Follow Stay Summon Drink Flee. Shift Hold Pull Go, plus Mark and Clear. Ctrl Kill Burn Skull Water Loop.</text>
+  <text class="note-strong" x="60" y="882">6-8  Orders</text>
+  <text class="note" x="160" y="882">Party chat, click only. Vendor needs a non-player. Reset is the stuck-cast order, not reset botAI.</text>
+  <text class="note-strong" x="60" y="904">9  Gear / Strat / Quest</text>
+  <text class="note" x="160" y="904">Gear keeps autogear, repair, talents, two-click leave. Strat is co/nc clicks. Quest accept and talk need a quest giver.</text>
+  <text class="muted" x="60" y="936">Hold Shift to arm the tank row, Ctrl to arm DPS. On other tabs the status line names the tab and notes that 1-5 still fight.</text>
+  <text class="muted" x="60" y="958">Strat: co +boost, co -boost, co +aoe, co -aoe, co +assist, co +threat, co +cc, co +avoid aoe, nc +loot, co ?, nc ?.</text>
+  <text class="muted" x="60" y="980">Quest: accept *, talk, quests, quests all. Accept and talk refuse a player or an empty target.</text>
 </svg>
